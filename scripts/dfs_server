@@ -1,0 +1,27 @@
+#!/usr/bin/python3
+
+import argparse
+import os
+import sys
+
+from dfs.helpers import *
+from dfs.df_cache import PandasDataFrameCache
+from dfs.df_server import CommandHandler, DataFrameServer
+
+
+parser = argparse.ArgumentParser(description='Run Python DataFrame Service.')
+parser.add_argument('--port', type=int, help='specify alternate port (default: 8000)', default=8000)
+parser.add_argument('--bind', type=str, help='specify alternate bind address (default: all interfaces)', default="0.0.0.0")
+parser.add_argument('--dir', type=str, help='specify alternate directory (default: current directory)', default=os.getcwd())
+parser.add_argument('--memory', type=int, help='specify alternate max memory usage (default: 1GB)', default=2**30)
+
+args = parser.parse_args()
+print(f"Serving on {args.bind} port {args.port} with max memory {args.memory} at root directory {args.dir}")
+
+cache = PandasDataFrameCache(max_memory=args.memory, root_path=args.dir)
+with DataFrameServer(cache, (args.bind, args.port), CommandHandler) as server:
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        sys.exit(0)
+

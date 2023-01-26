@@ -1,0 +1,64 @@
+#!/usr/bin/python3
+
+from colorama import Fore, init
+
+import argparse
+from multiprocessing.pool import ThreadPool
+from dfs.df_client import *
+import os
+
+def info() -> None:
+    print()
+    print(f"{Fore.GREEN}Welcome to DFS REPL")
+    print(f"{Fore.BLUE}author: Brian Guarraci")
+    print(f"{Fore.BLUE}repo  : https://github.com/briangu/dfs")
+    print(f"{Fore.YELLOW}crtl-c to quit")
+    print()
+
+
+init(autoreset=True)
+
+
+success = lambda input: f"{Fore.GREEN}{input}"
+failure = lambda input: f"{Fore.RED}{input}"
+
+def execute_cmd(c):
+    try:
+        return c.
+    except ConnectionError as e:
+        print(f"failed to connect")
+        return (0, 0)
+    except Exception as e:
+        import traceback
+        print(e)
+        traceback.print_exc(e)
+        return (0, 0)
+
+# https://dev.to/amal/building-the-python-repl-3468
+def repl(pool):
+    info()
+    try:
+        while True:
+            try:
+                p = input("?> ")
+                if len(p) == 0:
+                    continue
+                with pool.get_connection() as c:
+                    r = execute_cmd(c)
+                print(success(r))
+            except Exception as e:
+                print(failure(f"Error: {e.args}"))
+    except KeyboardInterrupt:
+        print("\nExiting...")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Run DataFrame Service command')
+    parser.add_argument('--port', type=int, help='specify alternate port (default: 8000)', default=8000)
+    parser.add_argument('--host', type=str, help='specify alternate host address (default: 127.0.0.1)', default="127.0.0.1")
+    # parser.add_argument('--dir', type=str, help='specify alternate source data directory (default: current directory)', default=os.getcwd())
+    parser.add_argument('--max_connections', type=int, help='specify alternate source data directory (default: 8)', default=8)
+
+    args = parser.parse_args()
+    with DataFrameConnectionPool(args.host, args.port, max_connections=args.max_connections) as pool:
+        repl(pool)
+
