@@ -32,9 +32,6 @@ def execute_stats_cmd(c, cmd_args):
     args = parser.parse_args(cmd_args)
     stats = c.get_stats(level=args.level)
     return json.dumps(stats, indent=2)
-    # s = sum([int(x) for x in stats['loaded_files'].values()])
-    # print(f"mem: {stats['memory']} sizes: {s}")
-    # stats = c.get_stats(level=1)
 
 
 def scan_file(pool, *args):
@@ -96,12 +93,12 @@ def execute_load_cmd(c,cmd_args):
 
 def compare_dfs(stats, df, dfs_root_path, *args):
     m = df_memory_usage(df)
-    print(f"{args} stats: {stats['memory']} df: {m}")
-    if int(stats['memory']) != int(m):
+    print(f"{args} stats: {stats['memory']['used']} df: {m}")
+    if int(stats['memory']['used']) != int(m):
         gzip_fname = os.path.join(dfs_root_path, get_file_path_from_key_path(*args))
         fdf = read_df(gzip_fname)
         print(len(df), len(fdf), df.equals(fdf))
-    assert int(stats['memory']) == int(m)
+    assert int(stats['memory']['used']) == int(m)
 
 
 def verify_file(pool, dfs_root_path, *args):
@@ -127,7 +124,7 @@ def execute_verify_cmd(c, cmd_args):
     unload_all_files(c)
 
     stats = c.get_stats(level=2)
-    assert int(stats['memory']) == 0
+    assert int(stats['memory']['used']) == 0
 
     for key in stats['all_files']:
         verify_file(pool, args.dir, *key)
