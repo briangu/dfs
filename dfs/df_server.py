@@ -61,7 +61,7 @@ class CommandHandler(socketserver.BaseRequestHandler):
                         break
                 except Exception as e:
                     import traceback
-                    traceback.logging.info_exc(e)
+                    traceback.print_exc(e)
                     break
 
     def finish(self):

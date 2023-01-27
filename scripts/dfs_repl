@@ -26,11 +26,15 @@ success = lambda input: f"{Fore.GREEN}{input}"
 failure = lambda input: f"{Fore.RED}{input}"
 
 
-def execute_stats_cmd(c, cmd_args):
-    parser = argparse.ArgumentParser(description='Run stats command')
+def stats_argparser():
+    parser = argparse.ArgumentParser(description='Run stats command', prog="stats")
     parser.add_argument('--level', type=int, help='specify alternate stats level (default: 0)', default=0)
-    args = parser.parse_args(cmd_args)
-    stats = c.get_stats(level=args.level)
+    return parser
+
+
+def execute_stats_cmd(pool, args):
+    with pool.get_connection() as c:
+        stats = c.get_stats(level=args.level)
     return json.dumps(stats, indent=2)
 
 
@@ -51,7 +55,7 @@ def scan_file(pool, *args):
         return (0, 0)
 
 
-def execute_scan_cmd(c, cmd_args):
+def execute_scan_cmd(pool, args):
     with pool.get_connection() as c:
         stats = c.get_stats(level=2)
     files = stats['all_files']
@@ -79,11 +83,13 @@ def send_file(pool, file_path, *args):
         c.insert_data(load_dataframe(file_path), *args)
 
 
-def execute_load_cmd(c,cmd_args):
-    parser = argparse.ArgumentParser(description='Run load command')
+def load_argparser():
+    parser = argparse.ArgumentParser(description='Run load command', prog="load")
     parser.add_argument('--dir', type=str, help='specify alternate files directory (default: current dir)', default=os.getcwd())
-    args = parser.parse_args(cmd_args)
+    return parser
 
+
+def execute_load_cmd(pool, args):
     arr = [f for f in os.listdir(args.dir) if os.path.isfile(f) and os.path.splitext(f)[1] == ".pkl"]
     with ThreadPool() as p:
         p.starmap(send_file, zip(repeat(pool), arr))
@@ -110,21 +116,26 @@ def verify_file(pool, dfs_root_path, *args):
         c.unload(*args)
 
 
-def unload_all_files(c):
-    stats = c.get_stats(level=2)
-    for key in stats['loaded_files'].keys():
-        c.unload(*key)
+def unload_all_files(pool):
+    with pool.get_connection() as c:
+        stats = c.get_stats(level=2)
+        for key in stats['loaded_files'].keys():
+            c.unload(*key)
+        stats = c.get_stats(level=0)
+        assert int(stats['memory']['used']) == 0
 
-
-def execute_verify_cmd(c, cmd_args):
-    parser = argparse.ArgumentParser(description='Run stats command')
+def verify_argparser():
+    parser = argparse.ArgumentParser(description='Run verify command', prog="verify")
     parser.add_argument('--dir', type=str, help='specify alternate files directory (default: current dir)', default=os.getcwd())
-    args = parser.parse_args(cmd_args)
+    return parser
 
-    unload_all_files(c)
 
-    stats = c.get_stats(level=2)
-    assert int(stats['memory']['used']) == 0
+def execute_verify_cmd(pool, args):
+
+    unload_all_files(pool)
+
+    with pool.get_connection() as c:
+        stats = c.get_stats(level=2)
 
     for key in stats['all_files']:
         verify_file(pool, args.dir, *key)
@@ -132,21 +143,23 @@ def execute_verify_cmd(c, cmd_args):
     return f"verified {len(stats['all_files'])} files"
 
 
-class UnknownCommandException(Exception):
+commands = {
+    "stats": (stats_argparser(), execute_stats_cmd),
+    "verify": (verify_argparser(), execute_verify_cmd),
+    "scan": (None, execute_scan_cmd),
+    "load": (load_argparser(), execute_load_cmd)
+}
+
+
+class UnknownCommandError(Exception):
     pass
 
 
-def execute_cmd(c, cmd_arr):
-    if cmd_arr[0] == "stats":
-        return execute_stats_cmd(c, cmd_arr[1:])
-    elif cmd_arr[0] == "verify":
-        return execute_verify_cmd(c, cmd_arr[1:])
-    elif cmd_arr[0] == "scan":
-        return execute_scan_cmd(c, cmd_arr[1:])
-    elif cmd_arr[0] == "load":
-        return execute_load_cmd(c, cmd_arr[1:])
-    else:
-        raise UnknownCommandException(f"unknown command: {cmd_arr[0]}")
+def execute_cmd(pool, cmd_arr):
+    cmd = commands.get(cmd_arr[0])
+    if cmd is None:
+        raise UnknownCommandError(f"Available commands: {list(commands.keys())}")
+    return cmd[1](pool, None if cmd[0] is None else cmd[0].parse_args(cmd_arr[1:]))
 
 
 # https://dev.to/amal/building-the-python-repl-3468
@@ -158,13 +171,12 @@ def repl(pool):
                 p = input("?> ")
                 if len(p) == 0:
                     continue
-                with pool.get_connection() as c:
-                    cmd_arr = shlex.split(p)
-                    if len(cmd_arr) == 0:
-                        continue
-                    if cmd_arr[0] == 'exit':
-                        break
-                    r = execute_cmd(c, cmd_arr)
+                cmd_arr = shlex.split(p)
+                if len(cmd_arr) == 0:
+                    continue
+                if cmd_arr[0] == 'exit':
+                    break
+                r = execute_cmd(pool, cmd_arr)
                 print(success(r))
             except Exception as e:
                 print(failure(f"Error: {e.args}"))
