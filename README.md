@@ -39,6 +39,10 @@ crtl-c to quit
 
 ?> stats
 {
-  "memory": "0"
+  "memory": {
+    "used": "0",
+    "free": "1073741824",
+    "max": "1073741824"
+  }
 }
 ```
