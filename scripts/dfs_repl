@@ -1,11 +1,14 @@
 #!/usr/bin/python3
 
+import argparse
+import shlex
+from itertools import repeat
+from multiprocessing.pool import ThreadPool
+
 from colorama import Fore, init
 
-import argparse
-from multiprocessing.pool import ThreadPool
 from dfs.df_client import *
-import os
+
 
 def info() -> None:
     print()
@@ -22,9 +25,26 @@ init(autoreset=True)
 success = lambda input: f"{Fore.GREEN}{input}"
 failure = lambda input: f"{Fore.RED}{input}"
 
-def execute_cmd(c):
+
+def execute_stats_cmd(c, cmd_args):
+    parser = argparse.ArgumentParser(description='Run stats command')
+    parser.add_argument('--level', type=int, help='specify alternate stats level (default: 0)', default=0)
+    args = parser.parse_args(cmd_args)
+    stats = c.get_stats(level=args.level)
+    print(json.dumps(stats, indent=2))
+    # s = sum([int(x) for x in stats['loaded_files'].values()])
+    # print(f"mem: {stats['memory']} sizes: {s}")
+    # stats = c.get_stats(level=1)
+    return True
+
+
+def scan_file(pool, *args):
     try:
-        return c.
+        with pool.get_connection() as c:
+            start_t = time.time_ns()
+            data = c.load(*args[0])
+            stop_t = time.time_ns()
+            return (stop_t - start_t)/(10**9), data['length'] / 1024
     except ConnectionError as e:
         print(f"failed to connect")
         return (0, 0)
@@ -33,6 +53,100 @@ def execute_cmd(c):
         print(e)
         traceback.print_exc(e)
         return (0, 0)
+
+
+def execute_scan_cmd(c, cmd_args):
+    with pool.get_connection() as c:
+        stats = c.get_stats(level=2)
+    files = stats['all_files']
+
+    print(f"scanning {len(files)} files...")
+
+    with ThreadPool() as p:
+        start_t = time.time()
+        timings = p.starmap(scan_file, zip(repeat(pool), files))
+        stop_t = time.time()
+        time_s = sum([x[0] for x in timings])
+        data_s = sum([x[1] for x in timings])
+        if time_s > 0:
+            print(f"{int((data_s / time_s) / 1000)} MB/s  {(stop_t - start_t)/len(files)} s/file")
+
+
+def load_dataframe(file_path):
+    with open(file_path, "rb") as f:
+        return pd.read_pickle(f.read())
+
+
+def send_file(pool, file_path, *args):
+    with pool as c:
+        c.insert_data(load_dataframe(file_path), *args)
+
+
+def execute_load_cmd(c,cmd_args):
+    parser = argparse.ArgumentParser(description='Run load command')
+    parser.add_argument('--dir', type=str, help='specify alternate files directory (default: current dir)', default=os.getcwd())
+    args = parser.parse_args(cmd_args)
+
+    arr = [f for f in os.listdir(args.dir) if os.path.isfile(f) and os.path.splitext(f)[1] == ".pkl"]
+    with ThreadPool() as p:
+        p.starmap(send_file, zip(repeat(pool), arr))
+
+
+def compare_dfs(stats, df, dfs_root_path, *args):
+    m = df_memory_usage(df)
+    print(f"{args} stats: {stats['memory']} df: {m}")
+    if int(stats['memory']) != int(m):
+        gzip_fname = os.path.join(dfs_root_path, get_file_path_from_key_path(*args))
+        fdf = read_df(gzip_fname)
+        print(len(df), len(fdf), df.equals(fdf))
+    assert int(stats['memory']) == int(m)
+
+
+def verify_file(pool, dfs_root_path, *args):
+    with pool.get_connection() as c:
+        c.load(*args)
+        stats = c.get_stats()
+        df = c.get_data(*args)
+        compare_dfs(stats, df, dfs_root_path, *args)
+        c.unload(*args)
+
+
+def unload_all_files(c):
+    stats = c.get_stats(level=2)
+    for key in stats['loaded_files'].keys():
+        c.unload(*key)
+
+
+def execute_verify_cmd(c, cmd_args):
+    parser = argparse.ArgumentParser(description='Run stats command')
+    parser.add_argument('--dir', type=str, help='specify alternate files directory (default: current dir)', default=os.getcwd())
+    args = parser.parse_args(cmd_args)
+
+    unload_all_files(c)
+
+    stats = c.get_stats(level=2)
+    assert int(stats['memory']) == 0
+
+    for key in stats['all_files']:
+        verify_file(pool, args.dir, *key)
+
+
+class UnknownCommandException(Exception):
+    pass
+
+
+def execute_cmd(c, cmd_arr):
+    if cmd_arr[0] == "stats":
+        return execute_stats_cmd(c, cmd_arr[1:])
+    elif cmd_arr[0] == "verify":
+        return execute_verify_cmd(c, cmd_arr[1:])
+    elif cmd_arr[0] == "scan":
+        return execute_scan_cmd(c, cmd_arr[1:])
+    elif cmd_arr[0] == "load":
+        return execute_load_cmd(c, cmd_arr[1:])
+    else:
+        raise UnknownCommandException(f"unknown command: {cmd_arr[0]}")
+
 
 # https://dev.to/amal/building-the-python-repl-3468
 def repl(pool):
@@ -44,21 +158,25 @@ def repl(pool):
                 if len(p) == 0:
                     continue
                 with pool.get_connection() as c:
-                    r = execute_cmd(c)
+                    cmd_arr = shlex.split(p)
+                    if len(cmd_arr) == 0:
+                        continue
+                    if cmd_arr[0] == 'exit':
+                        break
+                    r = execute_cmd(c, cmd_arr)
                 print(success(r))
             except Exception as e:
                 print(failure(f"Error: {e.args}"))
     except KeyboardInterrupt:
         print("\nExiting...")
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Run DataFrame Service command')
-    parser.add_argument('--port', type=int, help='specify alternate port (default: 8000)', default=8000)
-    parser.add_argument('--host', type=str, help='specify alternate host address (default: 127.0.0.1)', default="127.0.0.1")
-    # parser.add_argument('--dir', type=str, help='specify alternate source data directory (default: current directory)', default=os.getcwd())
-    parser.add_argument('--max_connections', type=int, help='specify alternate source data directory (default: 8)', default=8)
 
-    args = parser.parse_args()
-    with DataFrameConnectionPool(args.host, args.port, max_connections=args.max_connections) as pool:
-        repl(pool)
+parser = argparse.ArgumentParser(description='Run DataFrame Service command')
+parser.add_argument('--port', type=int, help='specify alternate port (default: 8000)', default=8000)
+parser.add_argument('--host', type=str, help='specify alternate host address (default: 127.0.0.1)', default="127.0.0.1")
+parser.add_argument('--max_connections', type=int, help='specify alternate source data directory (default: 8)', default=8)
+
+args = parser.parse_args()
+with DataFrameConnectionPool(args.host, args.port, max_connections=args.max_connections) as pool:
+    repl(pool)
 

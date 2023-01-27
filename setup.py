@@ -19,9 +19,9 @@ setup(
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License"
     ],
-    install_requires=['pandas~=1.5.1', 'pysimdjson~=5.0.2'],
+    install_requires=['pandas~=1.5.1', 'pysimdjson~=5.0.2', 'colorama'],
     python_requires='>=3.8',
     include_package_data=True,
     test_suite='tests',
-    scripts=['scripts/dfs_server']
+    scripts=['scripts/dfs_server', 'scripts/dfs_repl']
 )
