@@ -1,9 +1,12 @@
-import socket
 import multiprocessing as mp
-import simdjson as json
-from .helpers import *
+import os
+import socket
 import threading
 from queue import Queue
+
+import simdjson as json
+
+from .helpers import *
 
 
 class DataFrameConnectionFactory:
@@ -12,7 +15,7 @@ class DataFrameConnectionFactory:
         self.port = port
 
     def create_socket(self):
-        tprint(f"Creating connection to: {(self.host, self.port)}")
+        tinfo(f"Creating connection to: {(self.host, self.port)}")
         return socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def connect(self, sock):
@@ -66,10 +69,10 @@ class DataFrameConnectionPool:
         else:
             conn = self.connections.get()
             if not self.factory.is_connected(conn):
-                tprint(f"Releasing closed connection")
+                tinfo(f"Releasing closed connection")
                 conn = None
         if conn is None:
-            tprint(f"Creating socket")
+            tinfo(f"Creating socket")
             conn = self.factory.create_socket()
             attempts = 1
             while attempts <= self.max_retries:
@@ -77,13 +80,13 @@ class DataFrameConnectionPool:
                     self.factory.connect(conn)
                     break
                 except socket.error:
-                    tprint(f"Connection Failed, Retrying...{attempts}")
+                    tinfo(f"Connection Failed, Retrying...{attempts}")
                     time.sleep(2**attempts)
                     attempts += 1
             if self.factory.is_connected(conn):
-                tprint(f"Connection created after {attempts} attempts")
+                tinfo(f"Connection created after {attempts} attempts")
             else:
-                tprint(f"Connection failed after {attempts} attempts")
+                tinfo(f"Connection failed after {attempts} attempts")
                 self.semaphore.release()
                 raise ConnectionError(f"Connection failed after {attempts} attempts")
         return DataFrameClient(self, conn)

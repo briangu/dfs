@@ -27,13 +27,18 @@ $ dfs_server
 Serving on 0.0.0.0 port 8000 with max memory 1073741824 at root directory <current dir>
 ```
 
-Run Script
+Run DFS REPL
 ```bash
-$ git clone
-$ python3 scripts/show_stats.py
+$ rlwrap dfs_repl
+Creating connection pool with 8 connections
+
+Welcome to DFS REPL
+author: Brian Guarraci
+repo  : https://github.com/briangu/dfs
+crtl-c to quit
+
+?> stats
 {
-  "memory": "0",
-  "loaded_files": {}
+  "memory": "0"
 }
-mem: 0 sizes: 0
 ```

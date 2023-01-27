@@ -1,6 +1,9 @@
+import logging
+import os
 import socketserver
 
 import simdjson as json
+
 from .helpers import *
 
 
@@ -8,7 +11,7 @@ class CommandHandler(socketserver.BaseRequestHandler):
 
     def setup(self) -> None:
         addr = self.client_address[0]
-        print('Connection created by', addr)
+        logging.info(f'Connection created by {addr}')
 
     def process_command(self, conn, command):
         should_continue = True
@@ -36,7 +39,7 @@ class CommandHandler(socketserver.BaseRequestHandler):
         elif command['type'] == 'close':
             send_success(conn)
             addr = self.client_address[0]
-            # print('Connection closed by', addr)
+            logging.info(f'Connection closed by {addr}')
             should_continue = False
         return should_continue
 
@@ -49,7 +52,7 @@ class CommandHandler(socketserver.BaseRequestHandler):
                     data = None
                 if data is None:
                     addr = self.client_address[0]
-                    print('Connection dropped by', addr)
+                    logging.info(f'Connection dropped by {addr}')
                     break
                 command = json.loads(data.decode())
                 try:
@@ -58,12 +61,12 @@ class CommandHandler(socketserver.BaseRequestHandler):
                         break
                 except Exception as e:
                     import traceback
-                    traceback.print_exc(e)
+                    traceback.logging.info_exc(e)
                     break
 
     def finish(self):
         addr = self.client_address[0]
-        print('Connection finished by', addr)
+        logging.info(f'Connection finished by {addr}')
 
     def get_stored_file_paths(self):
         all_files = []
@@ -73,7 +76,13 @@ class CommandHandler(socketserver.BaseRequestHandler):
 
     def get_stats(self, level=None):
         level = 0 if level is None else level
-        stats = {'memory': str(self.server.cache.current_memory_usage)}
+        stats = {
+                'memory': {
+                    'used': str(self.server.cache.current_memory_usage),
+                    'free': str(self.server.cache.max_memory - self.server.cache.current_memory_usage),
+                    'max': str(self.server.cache.max_memory)
+                }
+            }
         if level >= 1:
             stats['loaded_files'] = {k:str(v) for k,v in self.server.cache.file_sizes.items()}
         if level >= 2:

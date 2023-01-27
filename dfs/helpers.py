@@ -1,5 +1,5 @@
 import gzip
-import os
+import logging
 import struct
 import threading
 import time
@@ -109,8 +109,8 @@ def timeit(func):
     return timeit_wrapper
 
 
-def tprint(*args, **kwargs):
-    print(f"tid: {threading.current_thread().ident}: ", *args, **kwargs)
+def tinfo(msg):
+    logging.info(f"tid: {threading.current_thread().ident}: " + msg)
 
 
 def serialize_df(df):
