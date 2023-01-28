@@ -42,6 +42,7 @@ def scan_file(pool, *args):
     try:
         with pool.get_connection() as c:
             start_t = time.time_ns()
+            tinfo(f"scanning: {args[0]}")
             data = c.load(*args[0])
             stop_t = time.time_ns()
             return (stop_t - start_t)/(10**9), data['length'] / 1024
@@ -74,13 +75,14 @@ def execute_scan_cmd(pool, args):
 
 
 def load_dataframe(file_path):
-    with open(file_path, "rb") as f:
-        return pd.read_pickle(f.read())
+    print(f"load_dataframe: {file_path}")
+    return pd.read_pickle(file_path)
 
 
 def send_file(pool, file_path, *args):
-    with pool as c:
-        c.insert_data(load_dataframe(file_path), *args)
+    print(f"send_file: {file_path} {args}")
+    with pool.get_connection() as c:
+        c.insert_data(load_dataframe(file_path), *args[0])
 
 
 def load_argparser():
@@ -90,11 +92,22 @@ def load_argparser():
 
 
 def execute_load_cmd(pool, args):
-    arr = [f for f in os.listdir(args.dir) if os.path.isfile(f) and os.path.splitext(f)[1] == ".pkl"]
+    files_arr = []
+    arg_arr = []
+    for path,_,files in os.walk(args.dir):
+        for f in files:
+            sp, se = os.path.splitext(f)
+            j = os.path.join(path, f)
+            if not (se == '.pkl' and os.path.isfile(j)):
+                continue
+            files_arr.append(j)
+            arg_arr.append(os.path.join(path[len(args.dir):], sp).split(os.sep))
+    print(files_arr)
+    print(arg_arr)
     with ThreadPool() as p:
-        p.starmap(send_file, zip(repeat(pool), arr))
+        p.starmap(send_file, zip(repeat(pool), files_arr, arg_arr))
 
-    return f"loaded {len(arr)} files"
+    return f"loaded {len(files_arr)} files"
 
 
 def compare_dfs(stats, df, dfs_root_path, *args):
@@ -119,10 +132,11 @@ def verify_file(pool, dfs_root_path, *args):
 def unload_all_files(pool):
     with pool.get_connection() as c:
         stats = c.get_stats(level=2)
-        for key in stats['loaded_files'].keys():
+        for key,_ in stats['loaded_files']:
             c.unload(*key)
         stats = c.get_stats(level=0)
         assert int(stats['memory']['used']) == 0
+
 
 def verify_argparser():
     parser = argparse.ArgumentParser(description='Run verify command', prog="verify")

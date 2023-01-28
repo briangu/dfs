@@ -2,6 +2,7 @@ import heapq
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
+from .helpers import tinfo
 from threading import Lock
 
 
@@ -69,6 +70,9 @@ class FileCache:
         Returns:
         - object: The processed contents of the file
         """
+        write_fname = os.path.join(self.root_path, file_name)
+        write_path = os.path.dirname(write_fname)
+        os.makedirs(write_path, exist_ok=True)
         with open(os.path.join(self.root_path, file_name), 'wb') as f:
             f.write(new_file_contents)
             if use_fsync:
@@ -196,6 +200,7 @@ class FileCache:
         Returns:
         bytes: the raw file contents
         """
+        tinfo(f"get_file: {file_name}")
         full_file_path = os.path.join(self.root_path, file_name)
         if not os.path.exists(full_file_path):
             raise FileNotFoundError(file_name)

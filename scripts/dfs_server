@@ -14,7 +14,7 @@ parser.add_argument('--port', type=int, help='specify alternate port (default: 8
 parser.add_argument('--bind', type=str, help='specify alternate bind address (default: all interfaces)', default="0.0.0.0")
 parser.add_argument('--dir', type=str, help='specify alternate directory (default: current directory)', default=os.getcwd())
 parser.add_argument('--memory', type=int, help='specify alternate max memory usage (default: 1GB)', default=2**30)
-parser.add_argument('--log', type=str, help='specify alternate logging level (default: WARN)', default=logging.WARN)
+parser.add_argument('--log', type=str, help='specify alternate logging level (default: WARN)', default="WARN")
 
 args = parser.parse_args()
 

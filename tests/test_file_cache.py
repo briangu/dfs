@@ -5,15 +5,22 @@ import unittest
 
 from dfs.file_cache import FileCache
 import time
+import platform
+
+# TODO: add MacOS RAM disk
+# hdiutil attach -nomount ram://$((2 * 1024 * 100))
+# diskutil eraseVolume HFS+ RAMDisk /dev/disk3
+# https://stackoverflow.com/questions/1854/how-to-identify-which-os-python-is-running-on
+tmp_dir = "/dev/shm" if platform.system() == "Linux" else None
 
 
 class FileCacheTests(unittest.TestCase):
     def setUp(self):
         print("setting up")
-        self.test_file_1 = tempfile.NamedTemporaryFile(delete=False, dir="/dev/shm")
-        self.test_file_2 = tempfile.NamedTemporaryFile(delete=False, dir="/dev/shm")
-        self.test_file_3 = tempfile.NamedTemporaryFile(delete=False, dir="/dev/shm")
-        self.test_file_4 = tempfile.NamedTemporaryFile(delete=False, dir="/dev/shm")
+        self.test_file_1 = tempfile.NamedTemporaryFile(delete=False, dir=tmp_dir)
+        self.test_file_2 = tempfile.NamedTemporaryFile(delete=False, dir=tmp_dir)
+        self.test_file_3 = tempfile.NamedTemporaryFile(delete=False, dir=tmp_dir)
+        self.test_file_4 = tempfile.NamedTemporaryFile(delete=False, dir=tmp_dir)
         self.file_cache = FileCache(max_memory=(len(b'test_file_1') * 4 - 1))
         print("setting up done")
 

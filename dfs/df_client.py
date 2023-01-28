@@ -96,14 +96,6 @@ class DataFrameConnectionPool:
         self.semaphore.release()
 
 
-def get_file_path_from_key_path(*args):
-    return os.path.join(*args[:-1], f"{args[-1]}.pkl")
-
-
-def get_key_path_from_file_path(file_path):
-    return tuple(os.path.splitext(file_path)[0].split(os.sep))
-
-
 class DataFrameClient:
     def __init__(self, pool, conn):
         self.pool = pool
@@ -116,28 +108,23 @@ class DataFrameClient:
         self.pool.release_connection(self.conn)
 
     def get_data(self, *args, range_start=None, range_end=None, range_type="timestamp"):
-        send_cmd(self.conn, 'get', file_path=get_file_path_from_key_path(*args), range_start=range_start, range_end=range_end, range_type=range_type)
+        send_cmd(self.conn, 'get', file_path=args, range_start=range_start, range_end=range_end, range_type=range_type)
         return recv_df(self.conn)
 
     def insert_data(self, df, *args):
-        send_cmd(self.conn, 'insert', file_path=get_file_path_from_key_path(*args))
+        send_cmd(self.conn, 'insert', file_path=args)
         send_df(self.conn, df)
         recv_status(self.conn)
 
     def unload(self, *args):
-        send_cmd(self.conn, 'unload', file_path=get_file_path_from_key_path(*args))
+        send_cmd(self.conn, 'unload', file_path=args)
         recv_status(self.conn)
 
     def load(self, *args):
-        send_cmd(self.conn, 'load', file_path=get_file_path_from_key_path(*args))
+        send_cmd(self.conn, 'load', file_path=args)
         return recv_json(self.conn)
 
     def get_stats(self, level=None):
         send_msg(self.conn, json.dumps({'type': 'stats', 'level': level}).encode())
-        j = recv_json(self.conn)
-        if 'loaded_files' in j:
-            j['loaded_files'] = {get_key_path_from_file_path(k):v for k,v in j['loaded_files'].items()}
-        if 'all_files' in j:
-            j['all_files'] = [get_key_path_from_file_path(f) for f in j['all_files']]
-        return j
+        return recv_json(self.conn)
 

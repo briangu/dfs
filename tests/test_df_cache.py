@@ -4,13 +4,17 @@ import os
 import threading
 from dfs.df_cache import PandasDataFrameCache
 import tempfile
+import platform
 
-
-
+# TODO: add MacOS RAM disk
+# hdiutil attach -nomount ram://$((2 * 1024 * 100))
+# diskutil eraseVolume HFS+ RAMDisk /dev/disk3
+# https://stackoverflow.com/questions/1854/how-to-identify-which-os-python-is-running-on
+tmp_dir = "/dev/shm" if platform.system() == "Linux" else None
 
 class TestPandasDataFrameCache(unittest.TestCase):
     def setUp(self):
-        self.test_file_1 = tempfile.NamedTemporaryFile(delete=False, dir="/dev/shm")
+        self.test_file_1 = tempfile.NamedTemporaryFile(delete=False, dir=tmp_dir)
         self.df = pd.DataFrame({'A': [1, 2, 3], 'B': [4, 5, 6]}, index=[1, 2, 3])
         self.cache = PandasDataFrameCache(max_memory=1024)
         self.cache.append(self.test_file_1.name, self.df)
@@ -43,8 +47,8 @@ class TestPandasDataFrameCache(unittest.TestCase):
 
 class TestMultithreadedPandasDataFrameCache(unittest.TestCase):
     def setUp(self):
-        self.test_file_1 = tempfile.NamedTemporaryFile(delete=False, dir="/dev/shm")
-        self.test_file_2 = tempfile.NamedTemporaryFile(delete=False, dir="/dev/shm")
+        self.test_file_1 = tempfile.NamedTemporaryFile(delete=False, dir=tmp_dir)
+        self.test_file_2 = tempfile.NamedTemporaryFile(delete=False, dir=tmp_dir)
         self.cache = PandasDataFrameCache(max_memory=2**30)
 
     def test_append_concurrently(self):
