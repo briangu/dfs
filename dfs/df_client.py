@@ -7,6 +7,7 @@ from queue import Queue
 import simdjson as json
 
 from .helpers import *
+import logging
 
 
 class DataFrameClient:
@@ -66,7 +67,7 @@ class DataFrameConnectionFactory:
 
 class DataFrameConnectionPool:
     def __init__(self, host, port, max_connections=int(mp.cpu_count()*0.8), max_retries=3, client_class=DataFrameClient):
-        print(f"Creating connection pool with {max_connections} connections")
+        logging.info(f"Creating connection pool with {max_connections} connections")
         self.factory = DataFrameConnectionFactory(host, port)
         self.max_connections = max_connections
         self.connections = Queue()
