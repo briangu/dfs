@@ -88,7 +88,7 @@ def recv_status(conn):
 
 
 def send_cmd(conn, name, **kwargs):
-    send_json(conn, type=name, **kwargs)
+    send_json(conn, name=name, **kwargs)
 
 
 def df_memory_usage(df):

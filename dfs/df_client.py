@@ -39,7 +39,7 @@ class DataFrameClient:
         return recv_json(self.conn)
 
     def get_stats(self, level=None):
-        send_msg(self.conn, json.dumps({'type': 'stats', 'level': level}).encode())
+        send_cmd(self.conn, 'stats', level=level)
         return recv_json(self.conn)
 
 
@@ -89,7 +89,7 @@ class DataFrameConnectionPool:
             conn = None
             try:
                 conn = self.connections.get()
-                send_msg(conn, json.dumps({'type': 'close'}).encode())
+                send_msg(conn, json.dumps({'name': 'close'}).encode())
                 recv_msg(conn)
             except Exception:
                 pass

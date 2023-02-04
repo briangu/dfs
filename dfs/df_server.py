@@ -24,29 +24,29 @@ class CommandHandler(socketserver.BaseRequestHandler):
     def process_command(self, conn, command):
         tinfo(json.dumps(command))
         should_continue = True
-        if command['type'] == 'insert':
+        if command['name'] == 'insert':
             df = recv_df(conn)
             self.server.cache.append(get_file_path_from_key_path(*command['key_path']), df)
             send_success(conn)
-        elif command['type'] == 'get':
+        elif command['name'] == 'get':
             file_path = get_file_path_from_key_path(*command['key_path'])
             df = self.server.cache.get_dataframe(file_path, command.get('range_start'), command.get('range_end'), command.get('range_type'))
             if df is None:
                 send_msg(conn, bytes([]))
             else:
                 send_df(conn, df)
-        elif command['type'] == 'stats':
+        elif command['name'] == 'stats':
             stats = self.get_stats(level=command.get('level'))
             send_msg(conn, json.dumps(stats).encode())
-        elif command['type'] == 'unload':
+        elif command['name'] == 'unload':
             file_path = get_file_path_from_key_path(*command['key_path'])
             self.server.cache.unload_file(file_path)
             send_success(conn)
-        elif command['type'] == 'load':
+        elif command['name'] == 'load':
             file_path = get_file_path_from_key_path(*command['key_path'])
             data = self.server.cache.get_file(file_path)
             send_json(conn, length=len(data))
-        elif command['type'] == 'close':
+        elif command['name'] == 'close':
             send_success(conn)
             addr = self.client_address[0]
             logging.info(f'Connection closed by {addr}')
