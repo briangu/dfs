@@ -74,15 +74,15 @@ def execute_scan_cmd(pool, args):
         return "no files"
 
 
-def load_dataframe(file_path):
-    print(f"load_dataframe: {file_path}")
+def import_dataframe(file_path):
+    print(f"import_dataframe: {file_path}")
     return pd.read_pickle(file_path)
 
 
 def send_file(pool, file_path, *args):
     print(f"send_file: {file_path} {args}")
     with pool.get_connection() as c:
-        c.insert_data(load_dataframe(file_path), *args[0])
+        c.update_df(import_dataframe(file_path), *args[0])
 
 
 def load_argparser():
@@ -161,7 +161,9 @@ commands = {
     "stats": (stats_argparser(), execute_stats_cmd),
     "verify": (verify_argparser(), execute_verify_cmd),
     "scan": (None, execute_scan_cmd),
-    "load": (load_argparser(), execute_load_cmd)
+    "import": (load_argparser(), execute_load_cmd)
+#    "get": 
+#   "export"
 }
 
 
