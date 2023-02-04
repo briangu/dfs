@@ -93,7 +93,8 @@ class CommandHandler(socketserver.BaseRequestHandler):
                     'max': str(self.server.cache.max_memory)
                 },
                 'config': {
-                    'root_path': self.server.cache.root_path
+                    'root_path': self.server.cache.root_path,
+                    'max_memory': str(self.server.cache.max_memory)
                 }
             }
         if level >= 1:
