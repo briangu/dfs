@@ -30,8 +30,6 @@ Serving on 0.0.0.0 port 8000 with max memory 1073741824 at root directory <curre
 Run DFS REPL
 ```bash
 $ rlwrap dfs_repl
-Creating connection pool with 8 connections
-
 Welcome to DFS REPL
 author: Brian Guarraci
 repo  : https://github.com/briangu/dfs
