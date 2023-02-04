@@ -17,7 +17,7 @@
 Install
 
 ```bash
-$ pip3 install git+https://github.com/briangu/dfs.git
+$ pip3 install dataframe-service 
 ```
 
 Start server
