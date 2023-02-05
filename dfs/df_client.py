@@ -54,14 +54,22 @@ class DataFrameClient(FileClient):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.pool.release_connection(self.conn)
 
-    def get_df(self, *args, range_start=None, range_end=None, range_type="timestamp"):
-        send_cmd(self.conn, 'df:get', key_path=args, range_start=range_start, range_end=range_end, range_type=range_type)
+    def filter(self, *args, range_start=None, range_end=None, range_type="timestamp"):
+        send_cmd(self.conn, 'filter', key_path=args, range_start=range_start, range_end=range_end, range_type=range_type, namespace=namespace)
         return recv_df(self.conn)
 
-    def update_df(self, df, *args):
-        send_cmd(self.conn, 'df:update', key_path=args)
+    def update(self, df, *args):
+        send_cmd(self.conn, 'update', key_path=args)
         send_df(self.conn, df)
         recv_status(self.conn)
+
+    def unload(self, *args):
+        send_cmd(self.conn, 'unload', key_path=args)
+        recv_status(self.conn)
+
+    def load(self, *args):
+        send_cmd(self.conn, 'load', key_path=args)
+        return recv_json(self.conn)
 
 
 class DataFrameConnectionFactory:
@@ -110,7 +118,7 @@ class DataFrameConnectionPool:
             conn = None
             try:
                 conn = self.connections.get()
-                send_msg(conn, json.dumps({'name': 'close'}).encode())
+                send_cmd(conn, 'close')
                 recv_msg(conn)
             except Exception:
                 pass
