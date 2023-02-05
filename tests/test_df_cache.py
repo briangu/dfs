@@ -17,7 +17,7 @@ class TestPandasDataFrameCache(unittest.TestCase):
         self.test_file_1 = tempfile.NamedTemporaryFile(delete=False, dir=tmp_dir)
         self.df = pd.DataFrame({'A': [1, 2, 3], 'B': [4, 5, 6]}, index=[1, 2, 3])
         self.cache = PandasDataFrameCache(max_memory=1024)
-        self.cache.append(self.test_file_1.name, self.df)
+        self.cache.update(self.test_file_1.name, self.df)
 
     def test_get_dataframe(self):
         start = 2
@@ -28,7 +28,7 @@ class TestPandasDataFrameCache(unittest.TestCase):
 
     def test_append(self):
         new_df = pd.DataFrame({'A': [4, 5, 6], 'B': [7, 8, 9]}, index=[4, 5, 6])
-        result = self.cache.append(self.test_file_1.name, new_df)
+        result = self.cache.update(self.test_file_1.name, new_df)
         expected = pd.concat([self.df, new_df]).sort_index().drop_duplicates()
         pd.testing.assert_frame_equal(result, expected)
 
@@ -39,7 +39,7 @@ class TestPandasDataFrameCache(unittest.TestCase):
     def test_memory_error(self):
         with self.assertRaises(MemoryError):
             self.cache = PandasDataFrameCache(max_memory=1)
-            self.cache.append(self.test_file_1.name, self.df)
+            self.cache.update(self.test_file_1.name, self.df)
 
     def tearDown(self):
         os.unlink(self.test_file_1.name)
@@ -55,11 +55,11 @@ class TestMultithreadedPandasDataFrameCache(unittest.TestCase):
         def run_append_1(cache, start_i):
             values = list(range(start_i, start_i+100))
             new_df = pd.DataFrame({'A': values, 'B': values}, index=values)
-            cache.append(self.test_file_1.name, new_df)
+            cache.update(self.test_file_1.name, new_df)
         def run_append_2(cache, start_i):
             values = list(range(start_i, start_i+100))
             new_df = pd.DataFrame({'C': values, 'D': values}, index=values)
-            cache.append(self.test_file_2.name, new_df)
+            cache.update(self.test_file_2.name, new_df)
 
         threads = []
         for i in range(100):

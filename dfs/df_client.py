@@ -55,11 +55,11 @@ class DataFrameClient(FileClient):
         self.pool.release_connection(self.conn)
 
     def get_df(self, *args, range_start=None, range_end=None, range_type="timestamp"):
-        send_cmd(self.conn, 'get_df', key_path=args, range_start=range_start, range_end=range_end, range_type=range_type)
+        send_cmd(self.conn, 'df:get', key_path=args, range_start=range_start, range_end=range_end, range_type=range_type)
         return recv_df(self.conn)
 
     def update_df(self, df, *args):
-        send_cmd(self.conn, 'update_df', key_path=args)
+        send_cmd(self.conn, 'df:update', key_path=args)
         send_df(self.conn, df)
         recv_status(self.conn)
 

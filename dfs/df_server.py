@@ -24,11 +24,11 @@ class CommandHandler(socketserver.BaseRequestHandler):
     def process_command(self, conn, command):
         tinfo(json.dumps(command))
         should_continue = True
-        if command['name'] == 'insert':
+        if command['name'] == 'df:update':
             df = recv_df(conn)
-            self.server.cache.append(get_file_path_from_key_path(*command['key_path']), df)
+            self.server.cache.update(get_file_path_from_key_path(*command['key_path']), df)
             send_success(conn)
-        elif command['name'] == 'get':
+        elif command['name'] == 'df:get':
             file_path = get_file_path_from_key_path(*command['key_path'])
             df = self.server.cache.get_dataframe(file_path, command.get('range_start'), command.get('range_end'), command.get('range_type'))
             if df is None:

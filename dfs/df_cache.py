@@ -56,13 +56,13 @@ class PandasDataFrameCache(FileCache):
             else:
                 return df[(df.index >= range_start)&(df.index <= range_end)] if range_type == "timestamp" else df[range_start:range_end]
 
-    def append(self, file_name, new_df):
+    def update(self, file_name, new_df):
         """
-        Append a DataFrame to the cache file.
+        Update a DataFrame to the cache file.
 
         Args:
-            file_name (str): The name of the file that should be appended.
-            new_df (DataFrame): The DataFrame to append.
+            file_name (str): The name of the file that should be updated.
+            new_df (DataFrame): The DataFrame with the update.
 
         Returns:
             DataFrame: The new DataFrame.
