@@ -108,20 +108,20 @@ class DataFrameClient:
         self.pool.release_connection(self.conn)
 
     def get_data(self, *args, range_start=None, range_end=None, range_type="timestamp"):
-        send_cmd(self.conn, 'get', file_path=args, range_start=range_start, range_end=range_end, range_type=range_type)
+        send_cmd(self.conn, 'get', key_path=args, range_start=range_start, range_end=range_end, range_type=range_type)
         return recv_df(self.conn)
 
     def insert_data(self, df, *args):
-        send_cmd(self.conn, 'insert', file_path=args)
+        send_cmd(self.conn, 'insert', key_path=args)
         send_df(self.conn, df)
         recv_status(self.conn)
 
     def unload(self, *args):
-        send_cmd(self.conn, 'unload', file_path=args)
+        send_cmd(self.conn, 'unload', key_path=args)
         recv_status(self.conn)
 
     def load(self, *args):
-        send_cmd(self.conn, 'load', file_path=args)
+        send_cmd(self.conn, 'load', key_path=args)
         return recv_json(self.conn)
 
     def get_stats(self, level=None):
