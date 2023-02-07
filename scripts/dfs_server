@@ -6,7 +6,7 @@ import os
 import sys
 
 from dfs.df_cache import PandasDataFrameCache
-from dfs.df_server import CommandHandler, DataFrameServer, CommandProcessRouter, DataFrameCommandProcessor
+from dfs.df_server import CommandHandler, DataFrameServer, CommandProcessRouter, DataFrameCommandProcessor, JsonFileCommandProcessor, BytesCommandProcessor
 from dfs.helpers import *
 
 parser = argparse.ArgumentParser(description='Run Python DataFrame Service.')
@@ -27,8 +27,12 @@ logging.info(f"Serving on {args.bind} port {args.port} with max memory {args.mem
 
 cache = PandasDataFrameCache(max_memory=args.memory, root_path=args.dir)
 router = CommandProcessRouter(
-        handler_map={'df': DataFrameCommandProcessor},
-        namespace_map={'historical': 'df'}
+        handler_map={
+                'df': DataFrameCommandProcessor,
+                'json':JsonFileCommandProcessor,
+                'b': BytesCommandProcessor
+            },
+        namespace_map={}
     )
 with DataFrameServer(cache, router, (args.bind, args.port), CommandHandler) as server:
     try:
