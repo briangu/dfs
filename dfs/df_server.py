@@ -8,7 +8,7 @@ from .helpers import *
 
 
 def to_key_path(file_path):
-    return os.path.splitext(file_path)[0].split(os.sep)
+    return file_path.split(os.sep)
 
 
 class ClientCloseException(Exception):
@@ -23,37 +23,38 @@ class DataFrameCommandProcessor:
 
     def process(self, server, conn, command):
         handled = True
-        if command['name'] == 'df:update':
+        name = command['name']
+        if name == 'df:update':
             df = recv_df(conn)
             server.cache.update(self._to_file_path(*command['key_path']), df)
             send_success(conn)
-        elif command['name'] == 'df:filter':
+        elif name == 'df:filter':
             file_path = self._to_file_path(*command['key_path'])
             df = server.cache.get_dataframe(file_path, command.get('range_start'), command.get('range_end'), command.get('range_type'))
             if df is None:
                 send_msg(conn, bytes([]))
             else:
                 send_df(conn, df)
-        elif command['name'] == 'unload':
+        elif name == 'unload':
             file_path = self._to_file_path(*command['key_path'])
             server.cache.unload_file(file_path)
             send_success(conn)
-        elif command['name'] == 'load':
+        elif name == 'load':
             file_path = self._to_file_path(*command['key_path'])
             data = server.cache.get_file(file_path)
             send_json(conn, length=len(data))
-        elif command['name'] == 'set':
+        elif name == 'set':
             data = recv_msg(conn)
             server.cache.update_file(self._to_file_path(*command['key_path']), data)
             send_success(conn)
-        elif command['name'] == 'get':
+        elif name == 'get':
             file_path = self._to_file_path(*command['key_path'])
             data = server.cache.get_file(file_path)
             send_msg(conn, data)
-        elif command['name'] == 'stats':
+        elif name == 'stats':
             stats = self.get_stats(server, level=command.get('level'))
             send_msg(conn, json.dumps(stats).encode())
-        elif command['name'] == 'close':
+        elif name == 'close':
             send_success(conn)
             raise ClientCloseException()
         else:
@@ -107,7 +108,7 @@ class CommandHandler(socketserver.BaseRequestHandler):
                 try:
                     handled = self.server.processor.process(self.server, conn, command)
                     if not handled:
-                        logging.warm(f"commadn not handled: {command}")
+                        logging.warm(f"command not handled: {command}")
                 except ClientCloseException as e:
                     addr = self.client_address[0]
                     logging.info(f'Connection closed by {addr}')
