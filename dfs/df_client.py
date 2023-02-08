@@ -1,49 +1,15 @@
+import logging
 import multiprocessing as mp
-import os
 import socket
 import threading
 from queue import Queue
 
-import simdjson as json
-
 from .helpers import *
-import logging
 
 
-class FileClient:
-    def __init__(self, pool, conn):
-        self.pool = pool
-        self.conn = conn
+class DataFrameClient():
+    # TODO: add 'del' operation
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.pool.release_connection(self.conn)
-
-#    def get(self, *args, range_start=None, range_end=None, range_type="timestamp"):
-#        send_cmd(self.conn, 'get', key_path=args, range_start=range_start, range_end=range_end, range_type=range_type)
-#        return recv_df(self.conn)
-
-#    def set(self, contents, *args):
-#        send_cmd(self.conn, 'set', key_path=args)
-#        send_df(self.conn, df)
-#        recv_status(self.conn)
-
-    def unload(self, *args):
-        send_cmd(self.conn, 'unload', key_path=args)
-        recv_status(self.conn)
-
-    def load(self, *args):
-        send_cmd(self.conn, 'load', key_path=args)
-        return recv_json(self.conn)
-
-    def get_stats(self, level=None):
-        send_cmd(self.conn, 'stats', level=level)
-        return recv_json(self.conn)
-
-
-class DataFrameClient(FileClient):
     def __init__(self, pool, conn):
         self.pool = pool
         self.conn = conn
@@ -55,13 +21,22 @@ class DataFrameClient(FileClient):
         self.pool.release_connection(self.conn)
 
     def filter(self, *args, range_start=None, range_end=None, range_type="timestamp"):
-        send_cmd(self.conn, 'filter', key_path=args, range_start=range_start, range_end=range_end, range_type=range_type, namespace=namespace)
+        send_cmd(self.conn, 'df:filter', key_path=args, range_start=range_start, range_end=range_end, range_type=range_type, namespace=namespace)
         return recv_df(self.conn)
 
     def update(self, df, *args):
-        send_cmd(self.conn, 'update', key_path=args)
+        send_cmd(self.conn, 'df:update', key_path=args)
         send_df(self.conn, df)
         recv_status(self.conn)
+
+    def get(self, *args):
+        send_cmd(self.conn, 'get', key_path=args)
+        return recv_msg(self.conn)
+
+    def set(self, contents, *args):
+       send_cmd(self.conn, 'set', key_path=args)
+       send_msg(self.conn, contents)
+       recv_status(self.conn)
 
     def unload(self, *args):
         send_cmd(self.conn, 'unload', key_path=args)
@@ -69,6 +44,10 @@ class DataFrameClient(FileClient):
 
     def load(self, *args):
         send_cmd(self.conn, 'load', key_path=args)
+        return recv_json(self.conn)
+
+    def get_stats(self, level=None):
+        send_cmd(self.conn, 'stats', level=level)
         return recv_json(self.conn)
 
 

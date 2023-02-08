@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import argparse
+import os
 import shlex
 from itertools import repeat
 from multiprocessing.pool import ThreadPool
@@ -162,7 +163,7 @@ commands = {
     "verify": (verify_argparser(), execute_verify_cmd),
     "scan": (None, execute_scan_cmd),
     "import": (load_argparser(), execute_load_cmd)
-#    "get": 
+#    "get":
 #   "export"
 }
 
