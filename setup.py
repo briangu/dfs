@@ -9,7 +9,7 @@ with open(os.path.join(directory, 'README.md'), encoding='utf-8') as f:
 setup(
     name='dataframe-service',
     packages=['dfs'],
-    version='0.1.6',
+    version='0.1.7',
     description='Pandas DataFrame Service (DFS).',
     author='Brian Guarraci',
     license='MIT',
