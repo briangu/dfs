@@ -45,6 +45,7 @@ def exec_scan_cmd(pool, args):
     with ThreadPool() as p:
         start_t = time.time()
         timings = p.starmap(scan_file, zip(repeat(pool), keys))
+
         stop_t = time.time()
         time_s = sum([x[0] for x in timings])
         data_s = sum([x[1] for x in timings])
@@ -221,4 +222,4 @@ if not isinstance(log_level, int):
 logging.basicConfig(level=log_level)
 
 with DataFrameConnectionPool(args.host, args.port, max_connections=args.max_connections) as pool:
-    args.func(pool, args)
+    print(args.func(pool, args))
