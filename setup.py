@@ -23,5 +23,5 @@ setup(
     python_requires='>=3.8',
     include_package_data=True,
     test_suite='tests',
-    scripts=['scripts/dfs_server', 'scripts/dfs_repl']
+    scripts=['scripts/dfs_server', 'scripts/dfs_cli']
 )
