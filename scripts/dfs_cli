@@ -72,7 +72,6 @@ def read_file(file_path):
 
 
 def set_file(pool, file_path, *args):
-    print(file_path, args)
     with pool.get_connection(FileClient) as c:
         _, se = os.path.splitext(file_path)
         print(se)
@@ -80,6 +79,12 @@ def set_file(pool, file_path, *args):
             c.set(serialize_df(read_dataframe_file(file_path)), *args)
         else:
             c.set(read_file(file_path), *args)
+
+
+def get_file(pool, file_path, *args):
+    with pool.get_connection(FileClient) as c:
+        with open(file_path, "wb") as f:
+            f.write(c.get(*args))
 
 
 def exec_set_cmd(pool, args):
@@ -102,6 +107,11 @@ def exec_import_cmd(pool, args):
         p.starmap(set_file, zip(repeat(pool), files_arr, arg_arr))
 
     return f"imported {len(files_arr)} files"
+
+
+def exec_get_cmd(pool, args):
+    get_file(pool, args.path, *args.key.split(os.sep))
+    return f"get {args.key} as {args.path}"
 
 
 def compare_dfs(stats, df, dfs_root_path, *args):
@@ -221,6 +231,11 @@ sp = subparsers.add_parser('set', help='Import a file')
 sp.add_argument('key', type=str, help='specify DFS key path')
 sp.add_argument('path', type=str, help='specify file path')
 sp.set_defaults(func=exec_set_cmd)
+
+sp = subparsers.add_parser('get', help='Export a file')
+sp.add_argument('key', type=str, help='specify DFS key path')
+sp.add_argument('path', type=str, help='specify file path')
+sp.set_defaults(func=exec_get_cmd)
 
 sp = subparsers.add_parser('verify', help='Verify directory')
 sp.add_argument('--dir', type=str, help='specify alternate files directory (default: current dir)', default=os.getcwd())
