@@ -11,15 +11,6 @@ from colorama import Fore, init
 from dfs.df_client import *
 
 
-def info() -> None:
-    print()
-    print(f"{Fore.GREEN}Welcome to DFS REPL")
-    print(f"{Fore.BLUE}author: Brian Guarraci")
-    print(f"{Fore.BLUE}repo  : https://github.com/briangu/dfs")
-    print(f"{Fore.YELLOW}crtl-c to quit")
-    print()
-
-
 def exec_stats_cmd(pool, level=0):
     with pool.get_connection() as c:
         stats = c.get_stats(level=level)
@@ -92,12 +83,10 @@ def exec_import_cmd(pool, args):
                 continue
             files_arr.append(j)
             arg_arr.append((os.path.join(path[len(args.dir):], sp).split(os.sep), se))
-    print(files_arr)
-    print(arg_arr)
     with ThreadPool() as p:
         p.starmap(set_file, zip(repeat(pool), files_arr, arg_arr))
 
-    return f"loaded {len(files_arr)} files"
+    return f"imported {len(files_arr)} files"
 
 
 def compare_dfs(stats, df, dfs_root_path, *args):
@@ -122,10 +111,12 @@ def verify_file(pool, dfs_root_path, *args):
 def unload_all_files(pool):
     with pool.get_connection() as c:
         stats = c.get_stats(level=2)
+        unloaded_cnt = len(stats['loaded_files'])
         for key,_ in stats['loaded_files']:
             c.unload(*key)
         stats = c.get_stats(level=0)
         assert int(stats['memory']['used']) == 0
+    return unloaded_cnt
 
 
 def exec_verify_cmd(pool, args):
@@ -159,12 +150,19 @@ def exec_cmd(pool, cmd_arr):
 
 
 # https://dev.to/amal/building-the-python-repl-3468
-def repl(pool):
+def exec_repl_cmd(pool, args):
     success = lambda input: f"{Fore.GREEN}{input}"
     failure = lambda input: f"{Fore.RED}{input}"
 
     init(autoreset=True)
-    info()
+
+    print()
+    print(f"{Fore.GREEN}Welcome to DFS REPL")
+    print(f"{Fore.BLUE}author: Brian Guarraci")
+    print(f"{Fore.BLUE}repo  : https://github.com/briangu/dfs")
+    print(f"{Fore.YELLOW}crtl-c to quit")
+    print()
+
     try:
         while True:
             try:
@@ -182,10 +180,6 @@ def repl(pool):
                 print(failure(f"Error: {e.args}"))
     except KeyboardInterrupt:
         print("\nExiting...")
-
-
-def exec_repl_cmd(pool, *args):
-    repl(pool)
 
 
 parser = argparse.ArgumentParser(description='Run DataFrame Service command')

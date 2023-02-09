@@ -172,6 +172,8 @@ class FileCache:
         None
         """
         with self.file_futures_lock:
+            self.file_access_times = [(t, fn) for t, fn in self.file_access_times if fn != file_name]
+            heapq.heapify(self.file_access_times)
             self._unload_file(file_name)
 
     def recover_memory(self, claim):
