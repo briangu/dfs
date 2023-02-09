@@ -15,7 +15,7 @@ class ClientCloseException(Exception):
     pass
 
 
-class DataFrameCommandProcessor:
+class SystemCommandProcessor:
 
     @staticmethod
     def _to_file_path(*args):
@@ -24,18 +24,7 @@ class DataFrameCommandProcessor:
     def process(self, server, conn, command):
         handled = True
         name = command['name']
-        if name == 'df:update':
-            df = recv_df(conn)
-            server.cache.update(self._to_file_path(*command['key_path']), df)
-            send_success(conn)
-        elif name == 'df:filter':
-            file_path = self._to_file_path(*command['key_path'])
-            df = server.cache.get_dataframe(file_path, command.get('range_start'), command.get('range_end'), command.get('range_type'))
-            if df is None:
-                send_msg(conn, bytes([]))
-            else:
-                send_df(conn, df)
-        elif name == 'unload':
+        if name == 'unload':
             file_path = self._to_file_path(*command['key_path'])
             server.cache.unload_file(file_path)
             send_success(conn)
@@ -43,14 +32,6 @@ class DataFrameCommandProcessor:
             file_path = self._to_file_path(*command['key_path'])
             data = server.cache.get_file(file_path)
             send_json(conn, length=len(data))
-        elif name == 'set':
-            data = recv_msg(conn)
-            server.cache.update_file(self._to_file_path(*command['key_path']), data)
-            send_success(conn)
-        elif name == 'get':
-            file_path = self._to_file_path(*command['key_path'])
-            data = server.cache.get_file(file_path)
-            send_msg(conn, data)
         elif name == 'stats':
             stats = self.get_stats(server, level=command.get('level'))
             send_msg(conn, json.dumps(stats).encode())
@@ -85,6 +66,53 @@ class DataFrameCommandProcessor:
         if level >= 2:
             stats['all_keys'] = self.get_all_key_paths(server.cache.root_path)
         return stats
+
+
+class FileCommandProcessor(SystemCommandProcessor):
+
+    @staticmethod
+    def _to_file_path(*args):
+        return os.path.join(*args)
+
+    def process(self, server, conn, command):
+        handled = True
+        name = command['name']
+        if name == 'set':
+            data = recv_msg(conn)
+            server.cache.update_file(self._to_file_path(*command['key_path']), data)
+            send_success(conn)
+        elif name == 'get':
+            file_path = self._to_file_path(*command['key_path'])
+            data = server.cache.get_file(file_path)
+            send_msg(conn, data)
+        else:
+            handled = super().process(server, conn, command)
+        return handled
+
+
+class DataFrameCommandProcessor(SystemCommandProcessor):
+
+    @staticmethod
+    def _to_file_path(*args):
+        return os.path.join(*args)
+
+    def process(self, server, conn, command):
+        handled = True
+        name = command['name']
+        if name == 'df:update':
+            df = recv_df(conn)
+            server.cache.update(self._to_file_path(*command['key_path']), df)
+            send_success(conn)
+        elif name == 'df:filter':
+            file_path = self._to_file_path(*command['key_path'])
+            df = server.cache.get_dataframe(file_path, command.get('range_start'), command.get('range_end'), command.get('range_type'))
+            if df is None:
+                send_msg(conn, bytes([]))
+            else:
+                send_df(conn, df)
+        else:
+            handled = super().process(server, conn, command)
+        return handled
 
 
 class CommandHandler(socketserver.BaseRequestHandler):
@@ -127,7 +155,18 @@ class DataFrameServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-    def __init__(self, cache, address, *args, processor=None, **kwargs):
+    def __init__(self, cache, address, *args, **kwargs):
         super().__init__(address, CommandHandler, *args, **kwargs)
         self.cache = cache
-        self.processor = processor or DataFrameCommandProcessor()
+        self.processor = DataFrameCommandProcessor()
+
+
+
+class FileServer(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+    def __init__(self, cache, address, *args, **kwargs):
+        super().__init__(address, CommandHandler, *args, **kwargs)
+        self.cache = cache
+        self.processor = FileCommandProcessor()

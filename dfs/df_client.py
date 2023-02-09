@@ -7,7 +7,31 @@ from queue import Queue
 from .helpers import *
 
 
-class DataFrameClient():
+class CommandClient():
+    def __init__(self, pool, conn):
+        self.pool = pool
+        self.conn = conn
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.pool.release_connection(self.conn)
+
+    def unload(self, *args):
+        send_cmd(self.conn, 'unload', key_path=args)
+        recv_status(self.conn)
+
+    def load(self, *args):
+        send_cmd(self.conn, 'load', key_path=args)
+        return recv_json(self.conn)
+
+    def get_stats(self, level=None):
+        send_cmd(self.conn, 'stats', level=level)
+        return recv_json(self.conn)
+
+
+class DataFrameClient(CommandClient):
     # TODO: add 'del' operation
 
     def __init__(self, pool, conn):
@@ -29,26 +53,29 @@ class DataFrameClient():
         send_df(self.conn, df)
         recv_status(self.conn)
 
+
+
+class FileClient(CommandClient):
+    # TODO: add 'del' operation
+
+    def __init__(self, pool, conn):
+        self.pool = pool
+        self.conn = conn
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.pool.release_connection(self.conn)
+
     def get(self, *args):
         send_cmd(self.conn, 'get', key_path=args)
         return recv_msg(self.conn)
 
     def set(self, contents, *args):
-       send_cmd(self.conn, 'set', key_path=args)
-       send_msg(self.conn, contents)
-       recv_status(self.conn)
-
-    def unload(self, *args):
-        send_cmd(self.conn, 'unload', key_path=args)
+        send_cmd(self.conn, 'set', key_path=args)
+        send_msg(self.conn, contents)
         recv_status(self.conn)
-
-    def load(self, *args):
-        send_cmd(self.conn, 'load', key_path=args)
-        return recv_json(self.conn)
-
-    def get_stats(self, level=None):
-        send_cmd(self.conn, 'stats', level=level)
-        return recv_json(self.conn)
 
 
 class DataFrameConnectionFactory:
@@ -81,7 +108,7 @@ class DataFrameConnectionPool:
         self.connections = Queue()
         self.semaphore = threading.Semaphore(max_connections)
         self.max_retries = max_retries
-        self.client_class = client_class
+        self.default_client_class = client_class
 
     def __enter__(self):
         return self
@@ -105,7 +132,7 @@ class DataFrameConnectionPool:
                 if conn is not None:
                     self.factory.close(conn)
 
-    def get_connection(self):
+    def get_connection(self, client_class=None):
         self.semaphore.acquire()
         if self.connections.empty():
             conn = None
@@ -132,7 +159,7 @@ class DataFrameConnectionPool:
                 tinfo(f"Connection failed after {attempts} attempts")
                 self.semaphore.release()
                 raise ConnectionError(f"Connection failed after {attempts} attempts")
-        return self.client_class(self, conn)
+        return (client_class or self.default_client_class)(self, conn)
 
     def release_connection(self, conn):
         self.connections.put(conn)

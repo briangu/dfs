@@ -72,12 +72,19 @@ def read_file(file_path):
 
 
 def set_file(pool, file_path, *args):
-    print(f"set_file: {file_path} {args}")
-    with pool.get_connection() as c:
-        if args[1] == ".pkl":
-            c.set(serialize_df(read_dataframe_file(file_path)), *args[0])
+    print(file_path, args)
+    with pool.get_connection(FileClient) as c:
+        _, se = os.path.splitext(file_path)
+        print(se)
+        if se == ".pkl":
+            c.set(serialize_df(read_dataframe_file(file_path)), *args)
         else:
-            c.set(read_file(file_path), *args[0])
+            c.set(read_file(file_path), *args)
+
+
+def exec_set_cmd(pool, args):
+    set_file(pool, args.path, *args.key.split(os.sep))
+    return f"set {args.path} as {args.key}"
 
 
 def exec_import_cmd(pool, args):
@@ -206,9 +213,14 @@ sp.set_defaults(func=exec_scan_cmd)
 sp = subparsers.add_parser('ls', help='List DFS keys')
 sp.set_defaults(func=exec_ls_cmd)
 
-sp = subparsers.add_parser('import', help='Import directory')
+sp = subparsers.add_parser('import', help='Import a directory structure')
 sp.add_argument('--dir', type=str, help='specify alternate files directory (default: current dir)', default=os.getcwd())
 sp.set_defaults(func=exec_import_cmd)
+
+sp = subparsers.add_parser('set', help='Import a file')
+sp.add_argument('key', type=str, help='specify DFS key path')
+sp.add_argument('path', type=str, help='specify file path')
+sp.set_defaults(func=exec_set_cmd)
 
 sp = subparsers.add_parser('verify', help='Verify directory')
 sp.add_argument('--dir', type=str, help='specify alternate files directory (default: current dir)', default=os.getcwd())
