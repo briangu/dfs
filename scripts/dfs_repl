@@ -75,38 +75,47 @@ def execute_scan_cmd(pool, args):
         return "no files"
 
 
-def import_dataframe(file_path):
+def read_dataframe(file_path):
     print(f"import_dataframe: {file_path}")
     return pd.read_pickle(file_path)
 
 
-def send_file(pool, file_path, *args):
+def read_file(file_path):
+    with open(file_path, "rb") as f:
+        return f.read()
+
+
+def set_file(pool, file_path, *args):
     print(f"send_file: {file_path} {args}")
     with pool.get_connection() as c:
-        c.update_df(import_dataframe(file_path), *args[0])
+        if args[1] == ".pkl":
+            c.set(serialize_df(read_dataframe(file_path)), *args[0])
+        else:
+            c.set(read_file(file_path), *args[0])
 
 
-def load_argparser():
-    parser = argparse.ArgumentParser(description='Run load command', prog="load")
+def import_argparser():
+    parser = argparse.ArgumentParser(description='Run import command', prog="load")
     parser.add_argument('--dir', type=str, help='specify alternate files directory (default: current dir)', default=os.getcwd())
     return parser
 
 
-def execute_load_cmd(pool, args):
+#
+def execute_import_cmd(pool, args):
     files_arr = []
     arg_arr = []
     for path,_,files in os.walk(args.dir):
         for f in files:
             sp, se = os.path.splitext(f)
             j = os.path.join(path, f)
-            if not (se == '.pkl' and os.path.isfile(j)):
+            if not os.path.isfile(j):
                 continue
             files_arr.append(j)
-            arg_arr.append(os.path.join(path[len(args.dir):], sp).split(os.sep))
+            arg_arr.append((os.path.join(path[len(args.dir):], sp).split(os.sep), se))
     print(files_arr)
     print(arg_arr)
     with ThreadPool() as p:
-        p.starmap(send_file, zip(repeat(pool), files_arr, arg_arr))
+        p.starmap(set_file, zip(repeat(pool), files_arr, arg_arr))
 
     return f"loaded {len(files_arr)} files"
 
@@ -115,7 +124,7 @@ def compare_dfs(stats, df, dfs_root_path, *args):
     m = df_memory_usage(df)
     print(f"{args} stats: {stats['memory']['used']} df: {m}")
     if int(stats['memory']['used']) != int(m):
-        gzip_fname = os.path.join(dfs_root_path, get_file_path_from_key_path(*args))
+        gzip_fname = os.path.join(dfs_root_path, os.path.join(*args))
         fdf = read_df(gzip_fname)
         print(len(df), len(fdf), df.equals(fdf))
     assert int(stats['memory']['used']) == int(m)
@@ -162,7 +171,7 @@ commands = {
     "stats": (stats_argparser(), execute_stats_cmd),
     "verify": (verify_argparser(), execute_verify_cmd),
     "scan": (None, execute_scan_cmd),
-    "import": (load_argparser(), execute_load_cmd)
+    "import": (import_argparser(), execute_import_cmd)
 #    "get":
 #   "export"
 }
