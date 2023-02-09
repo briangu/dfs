@@ -38,19 +38,19 @@ def scan_file(pool, *args):
 def exec_scan_cmd(pool, args):
     with pool.get_connection() as c:
         stats = c.get_stats(level=2)
-    files = stats['all_keys']
+    keys = stats['all_keys']
 
-    print(f"scanning {len(files)} files...")
+    print(f"scanning {len(keys)} keys...")
 
     with ThreadPool() as p:
         start_t = time.time()
-        timings = p.starmap(scan_file, zip(repeat(pool), files))
+        timings = p.starmap(scan_file, zip(repeat(pool), keys))
         stop_t = time.time()
         time_s = sum([x[0] for x in timings])
         data_s = sum([x[1] for x in timings])
         if time_s > 0:
-            return f"{int((data_s / time_s) / 1000)} MB/s  {(stop_t - start_t)/len(files)} s/file"
-        return "no files"
+            return f"{int((data_s / time_s) / 1000)} MB/s  {(stop_t - start_t)/len(keys)} s/file"
+        return "no keys"
 
 
 def exec_ls_cmd(pool, args):
@@ -71,7 +71,7 @@ def read_file(file_path):
 
 
 def set_file(pool, file_path, *args):
-    print(f"send_file: {file_path} {args}")
+    print(f"set_file: {file_path} {args}")
     with pool.get_connection() as c:
         if args[1] == ".pkl":
             c.set(serialize_df(read_dataframe_file(file_path)), *args[0])
@@ -136,7 +136,7 @@ def exec_verify_cmd(pool, args):
     for key in stats['all_keys']:
         verify_file(pool, args.dir, *key)
 
-    return f"verified {len(stats['all_keys'])} files"
+    return f"verified {len(stats['all_keys'])} keys"
 
 
 commands = {
