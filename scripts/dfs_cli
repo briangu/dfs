@@ -38,7 +38,7 @@ def scan_file(pool, *args):
 def exec_scan_cmd(pool, args):
     with pool.get_connection() as c:
         stats = c.get_stats(level=2)
-    files = stats['all_files']
+    files = stats['all_keys']
 
     print(f"scanning {len(files)} files...")
 
@@ -51,6 +51,13 @@ def exec_scan_cmd(pool, args):
         if time_s > 0:
             return f"{int((data_s / time_s) / 1000)} MB/s  {(stop_t - start_t)/len(files)} s/file"
         return "no files"
+
+
+def exec_ls_cmd(pool, args):
+    with pool.get_connection() as c:
+        stats = c.get_stats(level=2)
+    for key_path in stats['all_keys']:
+        print(os.sep.join(key_path))
 
 
 def read_dataframe_file(file_path):
@@ -108,11 +115,11 @@ def verify_file(pool, dfs_root_path, *args):
         c.unload(*args)
 
 
-def unload_all_files(pool):
+def unload_all_keys(pool):
     with pool.get_connection() as c:
         stats = c.get_stats(level=2)
-        unloaded_cnt = len(stats['loaded_files'])
-        for key,_ in stats['loaded_files']:
+        unloaded_cnt = len(stats['loaded_keys'])
+        for key,_ in stats['loaded_keys']:
             c.unload(*key)
         stats = c.get_stats(level=0)
         assert int(stats['memory']['used']) == 0
@@ -121,20 +128,20 @@ def unload_all_files(pool):
 
 def exec_verify_cmd(pool, args):
 
-    unload_all_files(pool)
+    unload_all_keys(pool)
 
     with pool.get_connection() as c:
         stats = c.get_stats(level=2)
 
-    for key in stats['all_files']:
+    for key in stats['all_keys']:
         verify_file(pool, args.dir, *key)
 
-    return f"verified {len(stats['all_files'])} files"
+    return f"verified {len(stats['all_keys'])} files"
 
 
 commands = {
     "stats": exec_stats_cmd,
-    "unload": unload_all_files
+    "unload": unload_all_keys
 }
 
 
@@ -187,20 +194,24 @@ parser.add_argument('--port', type=int, help='specify alternate port (default: 8
 parser.add_argument('--host', type=str, help='specify alternate host address (default: 127.0.0.1)', default="127.0.0.1")
 parser.add_argument('--max_connections', type=int, help='specify alternate source data directory (default: 8)', default=8)
 parser.add_argument('--log', type=str, help='specify alternate logging level (default: WARN)', default="WARN")
+
 subparsers = parser.add_subparsers(help='sub-command help')
-parser_repl = subparsers.add_parser('repl', help='DFS REPL')
-parser_repl.set_defaults(func=exec_repl_cmd)
+sp = subparsers.add_parser('repl', help='DFS REPL')
+sp.set_defaults(func=exec_repl_cmd)
 
-parser_scan = subparsers.add_parser('scan', help='Get DFS stats')
-parser_scan.set_defaults(func=exec_scan_cmd)
+sp = subparsers.add_parser('scan', help='Get DFS stats')
+sp.set_defaults(func=exec_scan_cmd)
 
-parser_import = subparsers.add_parser('import', help='Import directory')
-parser_import.add_argument('--dir', type=str, help='specify alternate files directory (default: current dir)', default=os.getcwd())
-parser_import.set_defaults(func=exec_import_cmd)
+sp = subparsers.add_parser('ls', help='List DFS keys')
+sp.set_defaults(func=exec_ls_cmd)
 
-parser_verify = subparsers.add_parser('verify', help='Verify directory')
-parser_verify.add_argument('--dir', type=str, help='specify alternate files directory (default: current dir)', default=os.getcwd())
-parser_verify.set_defaults(func=exec_verify_cmd)
+sp = subparsers.add_parser('import', help='Import directory')
+sp.add_argument('--dir', type=str, help='specify alternate files directory (default: current dir)', default=os.getcwd())
+sp.set_defaults(func=exec_import_cmd)
+
+sp = subparsers.add_parser('verify', help='Verify directory')
+sp.add_argument('--dir', type=str, help='specify alternate files directory (default: current dir)', default=os.getcwd())
+sp.set_defaults(func=exec_verify_cmd)
 
 args = parser.parse_args()
 

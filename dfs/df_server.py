@@ -61,11 +61,11 @@ class DataFrameCommandProcessor:
             handled = False
         return handled
 
-    def get_stored_file_paths(self, root_path):
-        all_files = []
+    def get_all_key_paths(self, root_path):
+        key_paths = []
         for path, _, files in os.walk(root_path):
-            all_files.extend([to_key_path(os.path.join(path[len(root_path)+1:], f)) for f in files])
-        return all_files
+            key_paths.extend([to_key_path(os.path.join(path[len(root_path)+1:], f)) for f in files])
+        return key_paths
 
     def get_stats(self, server, level=None):
         level = 0 if level is None else level
@@ -81,9 +81,9 @@ class DataFrameCommandProcessor:
                 },
             }
         if level >= 1:
-            stats['loaded_files'] = [[to_key_path(k),str(v)] for k,v in server.cache.file_sizes.items()]
+            stats['loaded_keys'] = [[to_key_path(k),str(v)] for k,v in server.cache.file_sizes.items()]
         if level >= 2:
-            stats['all_files'] = self.get_stored_file_paths(server.cache.root_path)
+            stats['all_keys'] = self.get_all_key_paths(server.cache.root_path)
         return stats
 
 
