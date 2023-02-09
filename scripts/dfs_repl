@@ -20,22 +20,9 @@ def info() -> None:
     print()
 
 
-init(autoreset=True)
-
-
-success = lambda input: f"{Fore.GREEN}{input}"
-failure = lambda input: f"{Fore.RED}{input}"
-
-
-def stats_argparser():
-    parser = argparse.ArgumentParser(description='Run stats command', prog="stats")
-    parser.add_argument('--level', type=int, help='specify alternate stats level (default: 0)', default=0)
-    return parser
-
-
-def execute_stats_cmd(pool, args):
+def exec_stats_cmd(pool, level=0):
     with pool.get_connection() as c:
-        stats = c.get_stats(level=args.level)
+        stats = c.get_stats(level=level)
     return json.dumps(stats, indent=2)
 
 
@@ -57,7 +44,7 @@ def scan_file(pool, *args):
         return (0, 0)
 
 
-def execute_scan_cmd(pool, args):
+def exec_scan_cmd(pool, args):
     with pool.get_connection() as c:
         stats = c.get_stats(level=2)
     files = stats['all_files']
@@ -75,7 +62,7 @@ def execute_scan_cmd(pool, args):
         return "no files"
 
 
-def read_dataframe(file_path):
+def read_dataframe_file(file_path):
     print(f"import_dataframe: {file_path}")
     return pd.read_pickle(file_path)
 
@@ -89,19 +76,12 @@ def set_file(pool, file_path, *args):
     print(f"send_file: {file_path} {args}")
     with pool.get_connection() as c:
         if args[1] == ".pkl":
-            c.set(serialize_df(read_dataframe(file_path)), *args[0])
+            c.set(serialize_df(read_dataframe_file(file_path)), *args[0])
         else:
             c.set(read_file(file_path), *args[0])
 
 
-def import_argparser():
-    parser = argparse.ArgumentParser(description='Run import command', prog="load")
-    parser.add_argument('--dir', type=str, help='specify alternate files directory (default: current dir)', default=os.getcwd())
-    return parser
-
-
-#
-def execute_import_cmd(pool, args):
+def exec_import_cmd(pool, args):
     files_arr = []
     arg_arr = []
     for path,_,files in os.walk(args.dir):
@@ -148,13 +128,7 @@ def unload_all_files(pool):
         assert int(stats['memory']['used']) == 0
 
 
-def verify_argparser():
-    parser = argparse.ArgumentParser(description='Run verify command', prog="verify")
-    parser.add_argument('--dir', type=str, help='specify alternate files directory (default: current dir)', default=os.getcwd())
-    return parser
-
-
-def execute_verify_cmd(pool, args):
+def exec_verify_cmd(pool, args):
 
     unload_all_files(pool)
 
@@ -168,12 +142,8 @@ def execute_verify_cmd(pool, args):
 
 
 commands = {
-    "stats": (stats_argparser(), execute_stats_cmd),
-    "verify": (verify_argparser(), execute_verify_cmd),
-    "scan": (None, execute_scan_cmd),
-    "import": (import_argparser(), execute_import_cmd)
-#    "get":
-#   "export"
+    "stats": exec_stats_cmd,
+    "unload": unload_all_files
 }
 
 
@@ -181,15 +151,19 @@ class UnknownCommandError(Exception):
     pass
 
 
-def execute_cmd(pool, cmd_arr):
+def exec_cmd(pool, cmd_arr):
     cmd = commands.get(cmd_arr[0])
     if cmd is None:
         raise UnknownCommandError(f"Available commands: {list(commands.keys())}")
-    return cmd[1](pool, None if cmd[0] is None else cmd[0].parse_args(cmd_arr[1:]))
+    return cmd(pool, *cmd_arr[1:])
 
 
 # https://dev.to/amal/building-the-python-repl-3468
 def repl(pool):
+    success = lambda input: f"{Fore.GREEN}{input}"
+    failure = lambda input: f"{Fore.RED}{input}"
+
+    init(autoreset=True)
     info()
     try:
         while True:
@@ -202,7 +176,7 @@ def repl(pool):
                     continue
                 if cmd_arr[0] == 'exit':
                     break
-                r = execute_cmd(pool, cmd_arr)
+                r = exec_cmd(pool, cmd_arr)
                 print(success(r))
             except Exception as e:
                 print(failure(f"Error: {e.args}"))
@@ -210,11 +184,30 @@ def repl(pool):
         print("\nExiting...")
 
 
+def exec_repl_cmd(pool, *args):
+    repl(pool)
+
+
 parser = argparse.ArgumentParser(description='Run DataFrame Service command')
 parser.add_argument('--port', type=int, help='specify alternate port (default: 8000)', default=8000)
 parser.add_argument('--host', type=str, help='specify alternate host address (default: 127.0.0.1)', default="127.0.0.1")
 parser.add_argument('--max_connections', type=int, help='specify alternate source data directory (default: 8)', default=8)
 parser.add_argument('--log', type=str, help='specify alternate logging level (default: WARN)', default="WARN")
+subparsers = parser.add_subparsers(help='sub-command help')
+parser_repl = subparsers.add_parser('repl', help='DFS REPL')
+parser_repl.set_defaults(func=exec_repl_cmd)
+
+parser_scan = subparsers.add_parser('scan', help='Get DFS stats')
+parser_scan.set_defaults(func=exec_scan_cmd)
+
+parser_import = subparsers.add_parser('import', help='Import directory')
+parser_import.add_argument('--dir', type=str, help='specify alternate files directory (default: current dir)', default=os.getcwd())
+parser_import.set_defaults(func=exec_import_cmd)
+
+parser_verify = subparsers.add_parser('verify', help='Verify directory')
+parser_verify.add_argument('--dir', type=str, help='specify alternate files directory (default: current dir)', default=os.getcwd())
+parser_verify.set_defaults(func=exec_verify_cmd)
+
 args = parser.parse_args()
 
 log_level = getattr(logging, args.log.upper(), None)
@@ -223,5 +216,4 @@ if not isinstance(log_level, int):
 logging.basicConfig(level=log_level)
 
 with DataFrameConnectionPool(args.host, args.port, max_connections=args.max_connections) as pool:
-    repl(pool)
-
+    args.func(pool, args)
