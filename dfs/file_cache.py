@@ -58,7 +58,7 @@ class FileCache:
             self.update_file_futures_and_memory(file_name, memory_usage=memory_usage)
             return contents
 
-    def _write_file(self, file_name, new_file_contents, use_fsync=True):
+    def _write_file(self, file_name, new_file_contents, use_fsync):
         """
         Write a file to the filesystem, with option to use fsync to ensure that all data is written to the filesystem.
 
@@ -91,6 +91,9 @@ class FileCache:
         Returns:
         None
         """
+        assert self.file_futures_lock.locked()
+        assert self.file_futures.get(file_name) is not None
+
         self.file_access_times = [(t, fn) for t, fn in self.file_access_times if fn != file_name]
         heapq.heappush(self.file_access_times, (time.time_ns(), file_name))
 
@@ -106,15 +109,19 @@ class FileCache:
         None
         """
         with self.file_futures_lock:
-            if file_name in self.file_sizes:
-                self.current_memory_usage -= self.file_sizes[file_name]
-            self.file_sizes[file_name] = memory_usage
-            self.current_memory_usage += self.file_sizes[file_name]
-            self.update_file_access_time(file_name)
+            if file_name in self.file_futures:
+                if file_name in self.file_sizes:
+                    self.current_memory_usage -= self.file_sizes[file_name]
+                self.file_sizes[file_name] = memory_usage
+                self.current_memory_usage += memory_usage
+                self.update_file_access_time(file_name)
+            else:
+                # file has been removed while it was writing
+                assert file_name not in self.file_sizes
             if file_name in self.file_write_futures:
                 self.file_write_futures.pop(file_name)
 
-    def update_file(self, file_name, new_file_contents):
+    def update_file(self, file_name, new_file_contents, use_fsync=False):
         """
         Update the content of a file.
 
@@ -125,6 +132,7 @@ class FileCache:
         Args:
         - file_name (str): the name of the file to be updated
         - new_data (Union[str, bytes]): the new content of the file
+        - use_fsync (bool): use fsync when writing to disk
 
         Returns:
         bool - True if update was applied.
@@ -135,9 +143,10 @@ class FileCache:
         with self.file_futures_lock:
             write_future = self.file_write_futures.get(file_name)
             if write_future is None:
+                # there's a race condition here where the file future could be evicted before the write completes
                 if not self.recover_memory(claim):
                     raise MemoryError(f"unable to recover memory for requsted file: {file_name} {claim}")
-                write_future = self.executor.submit(self._write_file, file_name, new_file_contents)
+                write_future = self.executor.submit(self._write_file, file_name, new_file_contents, use_fsync)
                 self.file_write_futures[file_name] = write_future
                 self.file_futures[file_name] = write_future
                 write_applied = True
@@ -213,13 +222,13 @@ class FileCache:
         with self.file_futures_lock:
             future = self.file_futures.get(file_name)
             if future is None:
-                write_future = self.file_write_futures.get(file_name)
-                if write_future is not None:
-                    return write_future.result()
                 if not self.recover_memory(claim):
                     raise MemoryError(f"unable to recover memory for requsted file: {file_name} {claim}")
                 future = self.executor.submit(self._load_file, file_name)
                 self.file_futures[file_name] = future
             else:
+                write_future = self.file_write_futures.get(file_name)
+                if write_future is not None:
+                    write_future.result()
                 self.update_file_access_time(file_name)
         return future.result()

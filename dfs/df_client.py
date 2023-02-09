@@ -45,7 +45,7 @@ class DataFrameClient(CommandClient):
         self.pool.release_connection(self.conn)
 
     def filter(self, *args, range_start=None, range_end=None, range_type="timestamp"):
-        send_cmd(self.conn, 'df:filter', key_path=args, range_start=range_start, range_end=range_end, range_type=range_type, namespace=namespace)
+        send_cmd(self.conn, 'df:filter', key_path=args, range_start=range_start, range_end=range_end, range_type=range_type)
         return recv_df(self.conn)
 
     def update(self, df, *args):
