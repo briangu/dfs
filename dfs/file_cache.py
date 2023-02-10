@@ -149,12 +149,6 @@ class FileCache:
         future.result()
         return write_applied
 
-    def _get_file_size(self, file_name):
-        assert self.file_futures_lock.locked()
-        info = self.file_futures.get(file_name)
-        # TODO: use info[1]
-        return 0 if (info is None or not info[-1].done()) else len(info[-1].result())
-
     def _unload_file(self, file_name):
         """
         Unload a file from memory.
@@ -166,8 +160,10 @@ class FileCache:
         None
         """
         assert self.file_futures_lock.locked()
-        self.current_memory_usage -= self._get_file_size(file_name)
-        del self.file_futures[file_name]
+        info = self.file_futures.get(file_name)
+        if info is not None:
+            self.current_memory_usage -= info[1]
+            del self.file_futures[file_name]
 
     def unload_file(self, file_name):
         """
