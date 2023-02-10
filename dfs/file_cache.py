@@ -227,8 +227,5 @@ class FileCache:
                 future = self.executor.submit(self._load_file, file_name)
                 self.file_futures[file_name] = future
             else:
-                write_future = self.file_write_futures.get(file_name)
-                if write_future is not None:
-                    write_future.result()
                 self.update_file_access_time(file_name)
         return future.result()
