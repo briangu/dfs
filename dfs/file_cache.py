@@ -91,7 +91,6 @@ class FileCache:
         """
         assert self.file_futures_lock.locked()
         assert self.file_futures.get(file_name) is not None
-
         self.file_access_times = [(t, fn) for t, fn in self.file_access_times if fn != file_name]
         heapq.heappush(self.file_access_times, (time.time_ns(), file_name))
 
@@ -110,9 +109,11 @@ class FileCache:
             # if not present, file has been removed while it was writing
             info = self.file_futures.get(file_name)
             if info is not None:
-                self.current_memory_usage += memory_usage
                 self.update_file_access_time(file_name)
-                self.file_futures[file_name] = (False, *info[1:])
+                if not self.recover_memory(memory_usage):
+                    raise MemoryError(f"unable to recover memory for requsted file: {file_name} {memory_usage} {self.max_memory} {self.current_memory_usage}")
+                self.current_memory_usage += memory_usage
+                self.file_futures[file_name] = (False, memory_usage, info[-1])
 
     def update_file(self, file_name, new_file_contents, use_fsync=False):
         """
@@ -137,8 +138,6 @@ class FileCache:
             info = self.file_futures.get(file_name)
             if info is None or not info[0]:
                 self._unload_file(file_name)
-                if not self.recover_memory(claim):
-                    raise MemoryError(f"unable to recover memory for requsted file: {file_name} {claim}")
                 future = self.executor.submit(self._write_file, file_name, new_file_contents, use_fsync)
                 self.file_futures[file_name] = (True, claim, future)
                 write_applied = True
@@ -191,9 +190,15 @@ class FileCache:
         bool: True if the claim is achieved, False otherwise
         """
         assert self.file_futures_lock.locked()
-        while (self.current_memory_usage + claim) > self.max_memory:
-            oldest_file = heapq.heappop(self.file_access_times)[1]
+        assert claim <= self.max_memory
+        start_mem = self.current_memory_usage
+        while (self.current_memory_usage + claim) > self.max_memory and len(self.file_access_times) > 0:
+            data = heapq.heappop(self.file_access_times)
+            oldest_file = data[1]
             self._unload_file(oldest_file)
+        recovered_mem = self.current_memory_usage - start_mem
+        if recovered_mem > 0:
+            tinfo(f"recovered: {recovered_mem}")
         return (self.current_memory_usage + claim) <= self.max_memory
 
     def get_file(self, file_name):
@@ -206,7 +211,6 @@ class FileCache:
         Returns:
         bytes: the raw file contents
         """
-        tinfo(f"get_file: {file_name}")
         full_file_path = os.path.join(self.root_path, file_name)
         if not os.path.exists(full_file_path):
             raise FileNotFoundError(file_name)
@@ -216,11 +220,12 @@ class FileCache:
         with self.file_futures_lock:
             info = self.file_futures.get(file_name)
             if info is None:
-                if not self.recover_memory(claim):
-                    raise MemoryError(f"unable to recover memory for requsted file: {file_name} {claim}")
+                tinfo(f"get_file*: {file_name}")
                 future = self.executor.submit(self._load_file, file_name)
                 self.file_futures[file_name] = (False, claim, future)
             else:
+                tinfo(f"get_file: {file_name}")
                 future = info[-1]
-                self.update_file_access_time(file_name)
+                if future.done():
+                    self.update_file_access_time(file_name)
         return future.result()

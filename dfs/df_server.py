@@ -62,7 +62,7 @@ class SystemCommandProcessor:
                 },
             }
         if level >= 1:
-            stats['loaded_keys'] = [[to_key_path(k),str(v)] for k,v in server.cache.file_sizes.items()]
+            stats['loaded_keys'] = [[to_key_path(k),str(v[1])] for k,v in server.cache.file_futures.items()]
         if level >= 2:
             stats['all_keys'] = self.get_all_key_paths(server.cache.root_path)
         return stats
