@@ -24,7 +24,6 @@ class FileCache:
         self.root_path = root_path or os.getcwd()
         self.current_memory_usage = 0
         self.file_futures = {}
-        self.file_sizes = {}
         self.file_write_futures = {}
         self.file_access_times = []
         self.file_futures_lock = Lock()
@@ -110,14 +109,11 @@ class FileCache:
         """
         with self.file_futures_lock:
             if file_name in self.file_futures:
-                if file_name in self.file_sizes:
-                    self.current_memory_usage -= self.file_sizes[file_name]
-                self.file_sizes[file_name] = memory_usage
                 self.current_memory_usage += memory_usage
                 self.update_file_access_time(file_name)
             else:
                 # file has been removed while it was writing
-                assert file_name not in self.file_sizes
+                pass
             if file_name in self.file_write_futures:
                 self.file_write_futures.pop(file_name)
 
@@ -143,7 +139,7 @@ class FileCache:
         with self.file_futures_lock:
             write_future = self.file_write_futures.get(file_name)
             if write_future is None:
-                # there's a race condition here where the file future could be evicted before the write completes
+                self._unload_file(file_name)
                 if not self.recover_memory(claim):
                     raise MemoryError(f"unable to recover memory for requsted file: {file_name} {claim}")
                 write_future = self.executor.submit(self._write_file, file_name, new_file_contents, use_fsync)
@@ -154,6 +150,11 @@ class FileCache:
                 write_applied = False
         write_future.result()
         return write_applied
+
+    def _get_file_size(self, file_name):
+        assert self.file_futures_lock.locked()
+        future = self.file_futures.get(file_name)
+        return 0 if (future is None or not future.done()) else len(future.result())
 
     def _unload_file(self, file_name):
         """
@@ -166,9 +167,8 @@ class FileCache:
         None
         """
         assert self.file_futures_lock.locked()
-        self.current_memory_usage -= self.file_sizes[file_name]
+        self.current_memory_usage -= self._get_file_size(file_name)
         del self.file_futures[file_name]
-        del self.file_sizes[file_name]
 
     def unload_file(self, file_name):
         """
@@ -227,8 +227,5 @@ class FileCache:
                 future = self.executor.submit(self._load_file, file_name)
                 self.file_futures[file_name] = future
             else:
-                write_future = self.file_write_futures.get(file_name)
-                if write_future is not None:
-                    write_future.result()
                 self.update_file_access_time(file_name)
         return future.result()

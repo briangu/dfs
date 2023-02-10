@@ -26,7 +26,9 @@ class FileCacheTests(unittest.TestCase):
 
     def test_get_file(self):
         print("test_get_file")
-        self.file_cache = FileCache(max_memory=(len(b'test_file_1') * 4 - 1))
+        file_len = len(b'test_file_1')
+        print(f"file_len == {file_len}")
+        self.file_cache = FileCache(max_memory=(file_len * 4 - 1))
         self.test_file_1.write(b'test_file_1')
         self.test_file_1.seek(0)
         self.test_file_2.write(b'test_file_2')
@@ -38,7 +40,12 @@ class FileCacheTests(unittest.TestCase):
 
         print("calling get_file")
         file_1_content = self.file_cache.get_file(self.test_file_1.name)
+        print(f"current_memory_usage: {self.file_cache.current_memory_usage}")
+        self.assertEqual(self.file_cache.current_memory_usage, file_len)
+
         file_2_content = self.file_cache.get_file(self.test_file_2.name)
+        self.assertEqual(self.file_cache.current_memory_usage, file_len * 2)
+
         self.assertEqual(file_1_content, b'test_file_1')
         self.assertEqual(file_2_content, b'test_file_2')
 
@@ -48,8 +55,6 @@ class FileCacheTests(unittest.TestCase):
 
         file_2_content_cached = self.file_cache.get_file(self.test_file_2.name)
         self.assertEqual(file_2_content_cached, b'test_file_2')
-
-        print(f"current_memory_usage: {self.file_cache.current_memory_usage}")
 
         # Test that the oldest file is evicted when the cache is full
         file_3_content = self.file_cache.get_file(self.test_file_3.name)
