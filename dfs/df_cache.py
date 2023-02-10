@@ -81,4 +81,4 @@ class PandasDataFrameCache(FileCache):
             df = df.sort_index()
             df = df[~df.index.duplicated(keep='first')]
             update_applied = self.update_file(file_name, serialize_df(df))
-            return df if update_applied else self.append(file_name, new_df)
+            return df if update_applied else self.update(file_name, new_df)

@@ -24,7 +24,6 @@ class FileCache:
         self.root_path = root_path or os.getcwd()
         self.current_memory_usage = 0
         self.file_futures = {}
-        self.file_write_futures = {}
         self.file_access_times = []
         self.file_futures_lock = Lock()
         self.executor = ThreadPoolExecutor()
@@ -108,14 +107,12 @@ class FileCache:
         None
         """
         with self.file_futures_lock:
-            if file_name in self.file_futures:
+            # if not present, file has been removed while it was writing
+            info = self.file_futures.get(file_name)
+            if info is not None:
                 self.current_memory_usage += memory_usage
                 self.update_file_access_time(file_name)
-            else:
-                # file has been removed while it was writing
-                pass
-            if file_name in self.file_write_futures:
-                self.file_write_futures.pop(file_name)
+                self.file_futures[file_name] = (False, *info[1:])
 
     def update_file(self, file_name, new_file_contents, use_fsync=False):
         """
@@ -137,24 +134,26 @@ class FileCache:
         if claim > self.max_memory:
             raise MemoryError(f"requested file update larger than max_memory: {file_name} {claim} {self.max_memory}")
         with self.file_futures_lock:
-            write_future = self.file_write_futures.get(file_name)
-            if write_future is None:
+            info = self.file_futures.get(file_name)
+            if info is None or not info[0]:
                 self._unload_file(file_name)
                 if not self.recover_memory(claim):
                     raise MemoryError(f"unable to recover memory for requsted file: {file_name} {claim}")
-                write_future = self.executor.submit(self._write_file, file_name, new_file_contents, use_fsync)
-                self.file_write_futures[file_name] = write_future
-                self.file_futures[file_name] = write_future
+                future = self.executor.submit(self._write_file, file_name, new_file_contents, use_fsync)
+                self.file_futures[file_name] = (True, claim, future)
                 write_applied = True
             else:
+                assert info[0]
+                future = info[-1]
                 write_applied = False
-        write_future.result()
+        future.result()
         return write_applied
 
     def _get_file_size(self, file_name):
         assert self.file_futures_lock.locked()
-        future = self.file_futures.get(file_name)
-        return 0 if (future is None or not future.done()) else len(future.result())
+        info = self.file_futures.get(file_name)
+        # TODO: use info[1]
+        return 0 if (info is None or not info[-1].done()) else len(info[-1].result())
 
     def _unload_file(self, file_name):
         """
@@ -218,14 +217,14 @@ class FileCache:
         claim = os.path.getsize(full_file_path)
         if claim > self.max_memory:
             raise MemoryError(f"requested file larger than max_memory: {file_name} {claim} {self.max_memory}")
-        future = None
         with self.file_futures_lock:
-            future = self.file_futures.get(file_name)
-            if future is None:
+            info = self.file_futures.get(file_name)
+            if info is None:
                 if not self.recover_memory(claim):
                     raise MemoryError(f"unable to recover memory for requsted file: {file_name} {claim}")
                 future = self.executor.submit(self._load_file, file_name)
-                self.file_futures[file_name] = future
+                self.file_futures[file_name] = (False, claim, future)
             else:
+                future = info[-1]
                 self.update_file_access_time(file_name)
         return future.result()
