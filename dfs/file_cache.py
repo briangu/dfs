@@ -106,11 +106,11 @@ class FileCache:
         None
         """
         with self.file_futures_lock:
+            if not self.recover_memory(memory_usage):
+                raise MemoryError(f"unable to recover memory for requsted file: {file_name} {memory_usage} {self.max_memory} {self.current_memory_usage}")
             # if not present, file has been removed while it was writing
             info = self.file_futures.get(file_name)
             if info is not None:
-                if not self.recover_memory(memory_usage):
-                    raise MemoryError(f"unable to recover memory for requsted file: {file_name} {memory_usage} {self.max_memory} {self.current_memory_usage}")
                 self.update_file_access_time(file_name)
                 self.current_memory_usage += memory_usage
                 self.file_futures[file_name] = (False, memory_usage, info[-1])
