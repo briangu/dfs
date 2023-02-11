@@ -53,8 +53,8 @@ class FileCache:
         """
         with open(os.path.join(self.root_path, file_name), 'rb') as file:
             contents, memory_usage = self.process_contents(file.read())
-            self.update_file_futures_and_memory(file_name, memory_usage=memory_usage)
-            return contents
+        self.update_file_futures_and_memory(file_name, memory_usage=memory_usage)
+        return contents
 
     def _write_file(self, file_name, new_file_contents, use_fsync):
         """
@@ -109,9 +109,9 @@ class FileCache:
             # if not present, file has been removed while it was writing
             info = self.file_futures.get(file_name)
             if info is not None:
-                self.update_file_access_time(file_name)
                 if not self.recover_memory(memory_usage):
                     raise MemoryError(f"unable to recover memory for requsted file: {file_name} {memory_usage} {self.max_memory} {self.current_memory_usage}")
+                self.update_file_access_time(file_name)
                 self.current_memory_usage += memory_usage
                 self.file_futures[file_name] = (False, memory_usage, info[-1])
 
