@@ -44,7 +44,10 @@ class PandasDataFrameCache(FileCache):
         Returns:
             DataFrame: The requested DataFrame.
         """
-        df = self.get_file(file_name)
+        try:
+            df = self.get_file(file_name)
+        except FileNotFoundError:
+            df = pd.DataFrame()
         if range_start is None:
             if range_end is None:
                 return df
