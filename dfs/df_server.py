@@ -141,7 +141,10 @@ class CommandHandler(socketserver.BaseRequestHandler):
                     addr = self.client_address[0]
                     logging.info(f'Connection closed by {addr}')
                     break
+                except MemoryError as e:
+                    logging.warn(f"memory error: {command}")
                 except Exception as e:
+                    logging.error(f"exception: {command} {e}")
                     import traceback
                     traceback.print_exc(e)
                     break

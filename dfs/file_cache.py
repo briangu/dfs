@@ -4,6 +4,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from .helpers import tinfo
 from threading import Lock
+import logging
 
 
 class FileCache:
@@ -106,14 +107,18 @@ class FileCache:
         None
         """
         with self.file_futures_lock:
-            if not self.recover_memory(memory_usage):
-                raise MemoryError(f"unable to recover memory for requsted file: {file_name} {memory_usage} {self.max_memory} {self.current_memory_usage}")
+            can_cache = self.recover_memory(memory_usage)
+            if not can_cache:
+                logging.warning(f"unable to recover memory for requsted file: {file_name} {memory_usage} {self.max_memory} {self.current_memory_usage}")
             # if not present, file has been removed while it was writing
             info = self.file_futures.get(file_name)
             if info is not None:
-                self.update_file_access_time(file_name)
-                self.current_memory_usage += memory_usage
-                self.file_futures[file_name] = (False, memory_usage, info[-1])
+                if can_cache:
+                    self.update_file_access_time(file_name)
+                    self.current_memory_usage += memory_usage
+                    self.file_futures[file_name] = (False, memory_usage, info[-1])
+                else:
+                    del self.file_futures[file_name]
 
     def update_file(self, file_name, new_file_contents, use_fsync=False):
         """
@@ -192,10 +197,17 @@ class FileCache:
         assert self.file_futures_lock.locked()
         assert claim <= self.max_memory
         start_mem = self.current_memory_usage
+        writing = []
         while (self.current_memory_usage + claim) > self.max_memory and len(self.file_access_times) > 0:
             data = heapq.heappop(self.file_access_times)
             oldest_file = data[1]
+            if self.file_futures[oldest_file][0]:
+                writing.append(data)
+                continue
             self._unload_file(oldest_file)
+        if len(writing) > 0:
+            for x in writing:
+                heapq.heappush(self.file_access_times, x)
         recovered_mem = self.current_memory_usage - start_mem
         if recovered_mem > 0:
             tinfo(f"recovered: {recovered_mem}")

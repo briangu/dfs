@@ -14,10 +14,13 @@ from dfs.file_cache import FileCache
 # diskutil eraseVolume HFS+ RAMDisk /dev/disk3
 # https://stackoverflow.com/questions/1854/how-to-identify-which-os-python-is-running-on
 
+def gen_data():
+    return bytearray(os.urandom(random.randint(10,50)))
+
 def gen_file(tmp_dir=None):
     tmp_dir = tmp_dir or ("/dev/shm" if platform.system() == "Linux" else None)
     f = tempfile.NamedTemporaryFile(delete=False, dir=tmp_dir)
-    d = bytearray(os.urandom(random.randint(10,50)))
+    d = gen_data()
     f.write(d)
     f.seek(0)
     return f,d,len(d)
@@ -85,7 +88,7 @@ class FileCacheTests(unittest.TestCase):
         self.assertEqual(content, info[1])
 
         # Update the file in the cache
-        new_contents = bytearray(os.urandom(random.randint(10,50)))
+        new_contents = gen_data()
         updated = self.file_cache.update_file(info[0].name, new_contents)
         self.assertTrue(updated)
         self.assertTrue(info[0].name in self.file_cache.file_futures)
@@ -111,7 +114,7 @@ class FileCacheTests(unittest.TestCase):
             self.assertEqual(content, info[1])
 
             # Update the file in the cache
-            new_contents = bytearray(os.urandom(random.randint(10,50)))
+            new_contents = gen_data()
             updated = self.file_cache.update_file(info[0].name, new_contents)
             self.assertTrue(updated)
 
@@ -127,16 +130,14 @@ class FileCacheTests(unittest.TestCase):
                 pool.starmap(update_file_thread, list(self.file_contents.values()))
 
     def test_update_file_multithreaded_expected(self):
-        name = self.file_contents[0][0].name
+        info = self.file_contents[0]
+        name = info[0].name
         self.failed = False
         self.run = True
 
         # Create a list of expected values for each thread
-        expected_values = [b'updated_test_file_1_thread_1', b'updated_test_file_1_thread_2', b'updated_test_file_1_thread_3',
-                           b'updated_test_file_1_thread_4', b'updated_test_file_1_thread_5', b'updated_test_file_1_thread_6',
-                           b'updated_test_file_1_thread_7', b'updated_test_file_1_thread_8', b'updated_test_file_1_thread_9',
-                           b'updated_test_file_1_thread_10']
-        all_read_expected_values = [b'test_file_1', *expected_values]
+        expected_values = [gen_data() for _ in range(10)]
+        all_read_expected_values = [info[1], *expected_values]
 
         def update_file_thread(file_name, contents):
             while self.run:
