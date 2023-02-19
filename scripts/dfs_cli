@@ -210,7 +210,7 @@ def exec_repl_cmd(pool, args):
 parser = argparse.ArgumentParser(description='Run DataFrame Service command')
 parser.add_argument('--port', type=int, help='specify alternate port (default: 8000)', default=8000)
 parser.add_argument('--host', type=str, help='specify alternate host address (default: 127.0.0.1)', default="127.0.0.1")
-parser.add_argument('--max_connections', type=int, help='specify alternate source data directory (default: 8)', default=8)
+parser.add_argument('--max_connections', type=int, help='specify alternate source data directory (default: 8)', default=None)
 parser.add_argument('--log', type=str, help='specify alternate logging level (default: WARN)', default="WARN")
 
 subparsers = parser.add_subparsers(help='sub-command help')

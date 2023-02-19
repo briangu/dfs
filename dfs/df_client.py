@@ -101,7 +101,10 @@ class DataFrameConnectionFactory:
 
 
 class DataFrameConnectionPool:
-    def __init__(self, host, port, max_connections=int(mp.cpu_count()*0.8), max_retries=3, client_class=DataFrameClient):
+    def __init__(self, host, port, max_connections=None, max_retries=None, client_class=None):
+        max_connections = max_connections or int(mp.cpu_count()*0.8)
+        max_retries = max_retries or 3
+        client_class = client_class or DataFrameClient
         logging.info(f"Creating connection pool with {max_connections} connections")
         self.factory = DataFrameConnectionFactory(host, port)
         self.max_connections = max_connections
